@@ -17,6 +17,16 @@ Lingua: **italiano semplice**, niente gergo.
 - Librerie esterne copiate in `vendor/`, non da CDN.
 - Pubblicata su GitHub Pages.
 
+## App Android (APK)
+- Capacitor 8.5.3 in `app-android/` (solo plugin App). L'APK contiene una copia dei file del sito (`copia-web.mjs`, niente `sw.js`).
+- Versione in `js/versione.js` (l'APK la legge da lì: 0.2.0 diventa 200). Per un rilascio alzare anche `VERSIONE` in `sw.js`.
+- Compilare: doppio clic su `app-android/crea-apk.bat` → `Desktop\Matrix.apk`. Java 21 e chiave di firma stanno in
+  `Desktop\MATRIX-CHIAVE-ANDROID` (**mai nel repository**: senza la stessa chiave i telefoni rifiutano gli aggiornamenti).
+- Rilascio: dopo il push, `gh release create v<versione> "..\Matrix.apk#Matrix.apk"`. All'apertura l'app legge
+  `releases/latest` e, se c'è una versione più nuova, propone "Scarica".
+- Da una sessione di Claude: lanciare `.\gradlew.bat assembleRelease` da `app-android\android` con `JAVA_HOME` preso da `java.txt`.
+  Se c'è più di un dispositivo collegato, usare sempre `adb -s <nome>`: c'è anche il telefono vero in rete.
+
 ## Controllo prima di ogni commit
 `strumenti/controllo-segreti.py` ferma il commit se trova chiavi. Si attiva con
 `git config core.hooksPath strumenti/git-hooks` (da rifare su ogni PC nuovo).

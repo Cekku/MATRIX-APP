@@ -1,5 +1,7 @@
 // Accesso: senza login non si vede nulla. Dopo il login si carica il Costrutto.
 import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA } from './config.js';
+import { VERSIONE } from './versione.js';
+import { nativa, attivaTastoIndietro, controllaAggiornamento } from './nativo.js';
 
 const $ = s => document.querySelector(s);
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, {
@@ -27,7 +29,11 @@ async function apri(utente) {
   document.body.classList.remove('chiuso');
   try { await script('vendor/three/three.min.js'); } catch (_) { /* il Costrutto mostra "3D non caricato" */ }
   await script('js/costrutto.js');
+  attivaTastoIndietro();
 }
+
+// nell'APK: all'apertura guarda se su GitHub c'è una versione più nuova
+controllaAggiornamento(VERSIONE);
 
 function mostraModulo(messaggio = '') {
   $('#attesa').hidden = true; $('#entra').hidden = false;
@@ -58,7 +64,8 @@ db.auth.getSession().then(({ data }) => data.session ? apri(data.session.user) :
   .catch(() => mostraModulo());
 
 // app installabile: il service worker tiene una copia per aprirsi senza rete e prende da solo le versioni nuove
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// (non nell'APK: lì i file sono già nel telefono e gli aggiornamenti arrivano come APK nuovo)
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !nativa) {
   const giàControllata = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
     // controlla se c'è una versione nuova ogni volta che si torna sull'app

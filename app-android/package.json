@@ -1,0 +1,17 @@
+{
+  "name": "matrix-android",
+  "private": true,
+  "description": "App Android della Matrix (Capacitor): stessi file del sito, dentro un APK",
+  "scripts": {
+    "copia": "node copia-web.mjs",
+    "sync": "node copia-web.mjs && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
