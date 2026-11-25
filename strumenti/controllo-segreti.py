@@ -22,6 +22,9 @@ for nome in file_in_commit:
     contenuto = subprocess.run(["git", "show", f":{nome}"], capture_output=True).stdout
     testo = contenuto.decode("utf-8", errors="ignore")
     for cosa, regola in SOSPETTI.items():
+        # nelle librerie copiate (vendor/) "password: x" è codice, non una password: lì si cercano solo le chiavi
+        if cosa == "password scritta" and nome.startswith("vendor/"):
+            continue
         if regola.search(testo):
             problemi.append(f"  {nome}: sembra contenere un {cosa}")
 
