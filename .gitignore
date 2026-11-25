@@ -1,0 +1,7 @@
+.env
+*.env
+*segreti*
+!strumenti/controllo-segreti.py
+*KEY*.txt
+dati-veri/
+.claude/settings.local.json
