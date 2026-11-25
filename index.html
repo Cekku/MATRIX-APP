@@ -275,6 +275,8 @@ body:not(.chiuso) #accesso{display:none}
 #accesso button:disabled{opacity:.6;cursor:wait}
 #accesso .errore{min-height:1.2em;color:var(--red);font:500 14px var(--sans)}
 #accesso .attesa{color:var(--mut);font:400 15px var(--sans)}
+#accesso button.link{margin:0;padding:4px;background:none;color:var(--mut);font:500 14px var(--sans);text-decoration:underline}
+#accesso .info{min-height:1.2em;color:var(--ok);font:500 14px/1.4 var(--sans)}
 #cassetto .esci{margin-top:16px;width:100%;font:500 14px var(--sans);color:var(--tx);background:transparent;
   border:1px solid var(--linea-forte);border-radius:10px;padding:10px;cursor:pointer}
 #nuova{position:fixed;z-index:40;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
@@ -292,6 +294,16 @@ body:not(.chiuso) #accesso{display:none}
     <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
     <button id="entra-btn" type="submit">Entra</button>
     <div class="errore" id="errore" role="alert"></div>
+    <button class="link" id="dimenticata" type="button">Password dimenticata?</button>
+    <div class="info" id="info" role="status"></div>
+  </form>
+  <form id="nuova-pw" hidden>
+    <h1>Nuova password</h1>
+    <p>Scegli la password per entrare nella Matrix. Almeno 10 caratteri.</p>
+    <label>Nuova password<input id="pw1" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Ripetila<input id="pw2" type="password" autocomplete="new-password" minlength="10" required></label>
+    <button id="nuova-btn" type="submit">Salva ed entra</button>
+    <div class="errore" id="errore2" role="alert"></div>
   </form>
 </section>
 <canvas id="fondo-pioggia"></canvas>

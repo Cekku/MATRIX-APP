@@ -1,9 +1,13 @@
 // Accesso: senza login non si vede nulla. Dopo il login si carica il Costrutto.
-import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA } from './config.js';
+import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, INDIRIZZO_APP } from './config.js';
 import { VERSIONE } from './versione.js';
 import { nativa, attivaTastoIndietro, controllaAggiornamento } from './nativo.js';
 
 const $ = s => document.querySelector(s);
+// arrivo dal collegamento della mail "nuova password": lo leggo prima che Supabase pulisca l'indirizzo
+const dallaMail = new URLSearchParams(location.hash.slice(1));
+const recupero = dallaMail.get('type') === 'recovery';
+const erroreMail = dallaMail.get('error_code');
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'matrix-accesso' },
 });
@@ -36,7 +40,7 @@ async function apri(utente) {
 controllaAggiornamento(VERSIONE);
 
 function mostraModulo(messaggio = '') {
-  $('#attesa').hidden = true; $('#entra').hidden = false;
+  $('#attesa').hidden = true; $('#nuova-pw').hidden = true; $('#entra').hidden = false;
   $('#errore').textContent = messaggio; $('#email').focus();
 }
 
@@ -52,6 +56,35 @@ $('#entra').addEventListener('submit', async e => {
   apri(data.user);
 });
 
+// "Password dimenticata?": Supabase manda una mail con un collegamento che riporta qui
+$('#dimenticata').addEventListener('click', async () => {
+  const email = $('#email').value.trim(); $('#errore').textContent = ''; $('#info').textContent = '';
+  if (!email) { $('#errore').textContent = 'Scrivi prima la tua email qui sopra.'; return $('#email').focus(); }
+  const btn = $('#dimenticata'); btn.disabled = true;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: INDIRIZZO_APP });
+  btn.disabled = false;
+  if (error && /rate|limit|seconds/i.test(error.message || '')) $('#errore').textContent = 'Troppe mail in poco tempo: riprova fra un’ora.';
+  else if (error && /fetch|network/i.test(error.message || '')) $('#errore').textContent = 'Non riesco a raggiungere il server. Controlla la connessione.';
+  // stessa risposta che l'email esista o no: così nessuno può scoprire quali email sono iscritte
+  else $('#info').textContent = 'Se l’email è giusta, ti arriva una mail con il collegamento. Aprilo da questo dispositivo o dal PC.';
+});
+
+// schermata "Nuova password": si apre solo arrivando dal collegamento della mail
+function mostraNuovaPassword() {
+  $('#attesa').hidden = true; $('#entra').hidden = true; $('#nuova-pw').hidden = false; $('#pw1').focus();
+}
+$('#nuova-pw').addEventListener('submit', async e => {
+  e.preventDefault();
+  const a = $('#pw1').value, b = $('#pw2').value; $('#errore2').textContent = '';
+  if (a !== b) { $('#errore2').textContent = 'Le due password non sono uguali.'; return; }
+  const btn = $('#nuova-btn'); btn.disabled = true;
+  const { data, error } = await db.auth.updateUser({ password: a });
+  btn.disabled = false; $('#pw1').value = ''; $('#pw2').value = '';
+  if (error) { $('#errore2').textContent = /weak|short|characters/i.test(error.message || '') ? 'Password troppo debole: usane una più lunga.' : 'Non riesco a salvarla. Richiedi una mail nuova e riprova.'; return; }
+  history.replaceState(null, '', location.pathname);
+  apri(data.user);
+});
+
 // "Esci": chiude la sessione e ricarica la pagina (così del Costrutto non resta niente in memoria)
 document.addEventListener('click', async e => {
   if (!e.target.closest('#esci')) return;
@@ -59,9 +92,16 @@ document.addEventListener('click', async e => {
   location.reload();
 });
 
-db.auth.onAuthStateChange(evento => { if (evento === 'SIGNED_OUT' && aperto) location.reload(); });
-db.auth.getSession().then(({ data }) => data.session ? apri(data.session.user) : mostraModulo())
-  .catch(() => mostraModulo());
+db.auth.onAuthStateChange(evento => {
+  if (evento === 'SIGNED_OUT' && aperto) location.reload();
+  if (evento === 'PASSWORD_RECOVERY' && !aperto) mostraNuovaPassword();
+});
+db.auth.getSession().then(({ data }) => {
+  if (recupero && data.session) return mostraNuovaPassword();
+  if (erroreMail) { history.replaceState(null, '', location.pathname);
+    return mostraModulo(erroreMail === 'otp_expired' ? 'Il collegamento della mail è scaduto o già usato: chiedine uno nuovo.' : 'Il collegamento della mail non funziona: chiedine uno nuovo.'); }
+  data.session ? apri(data.session.user) : mostraModulo();
+}).catch(() => mostraModulo());
 
 // app installabile: il service worker tiene una copia per aprirsi senza rete e prende da solo le versioni nuove
 // (non nell'APK: lì i file sono già nel telefono e gli aggiornamenti arrivano come APK nuovo)
