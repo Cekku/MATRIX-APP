@@ -92,6 +92,9 @@ button.pl-riga{cursor:pointer} button.pl-riga:hover{background:var(--pl-tenue)}
 .pl-mappa .info{position:absolute;left:10px;right:60px;top:10px;padding:10px 12px;border-radius:12px;background:var(--vetro-forte);
   border:1px solid var(--linea-forte);font-size:14px}
 .pl-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--mut)}
+.pl-leg{background:none;border:1px solid transparent;border-radius:999px;padding:5px 10px;color:var(--mut);font:inherit;cursor:pointer;min-height:32px}
+.pl-leg.on{border-color:var(--linea-forte);color:var(--tx);background:var(--pl-tenue)}
+.pl-leg::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--c)}
 .pl-legenda span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--c)}
 /* navigazione: in basso sul telefono, a sinistra sul PC */
 .pl-nav{order:3;display:flex;border-top:1px solid var(--linea);background:var(--pl-nav);padding-bottom:env(safe-area-inset-bottom,0px)}

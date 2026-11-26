@@ -32,6 +32,7 @@ const I = {
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   freccia: '<path d="M9 6l6 6-6 6"/>',
   testo: '<path d="M4 7V5h10v2M9 5v14M7 19h4"/><path d="M14 12v-1h6v1M17 11v8M15.5 19h3"/>',
+  scarica: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
   sole: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
   cerca: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
 };
@@ -46,7 +47,13 @@ const famiglia = col => FAM.find(f => f[1].test(String(col || ''))) || FAM[FAM.l
 const SCHEDE = [['oggi', 'Oggi'], ['stalla', 'Stalla'], ['campi', 'Campi'], ['magazzino', 'Magazzino'], ['mercati', 'Mercati'], ['auto', 'Auto'], ['notizie', 'Notizie']];
 const IN_BASSO = ['oggi', 'stalla', 'campi', 'magazzino'];
 
-const stato = { scheda: 'oggi', filtroMag: '', catMag: '', ordMag: 'nome', cercaCampo: '', campoSel: null };
+// installazione come app (Chrome ed Edge, sul PC e sul telefono): il browser avvisa quando si può
+let installa = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installa = e; });
+addEventListener('appinstalled', () => { installa = null; });
+const installata = () => matchMedia('(display-mode: standalone)').matches || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+
+const stato = { famSel: '', argNot: '', scheda: 'oggi', filtroMag: '', catMag: '', ordMag: 'nome', cercaCampo: '', campoSel: null };
 let opz = {};
 const D = k => (window.MATRIX_DATI || {})[k] || null;      // {dati, aggiornato}
 const dati = k => (D(k) || {}).dati || null;
@@ -215,7 +222,8 @@ function svgMappa() {
   const q = stato.cercaCampo.toLowerCase();
   return `<svg viewBox="${MAPPA.vb.join(' ')}" preserveAspectRatio="xMidYMid meet" id="mappa-svg" role="img" aria-label="mappa dei campi">
     ${MAPPA.poli.map((p, i) => { const f = famiglia(p.c.coltura), spento = q && !String(p.c.nome).toLowerCase().includes(q);
-      return `<path d="${p.d}" data-i="${i}" fill="${f[2]}" fill-opacity="${spento ? .12 : .82}" fill-rule="evenodd" class="${stato.campoSel === i ? 'sel' : ''}"><title>${esc(p.c.nome)}</title></path>`; }).join('')}</svg>`;
+      const fuori = spento || (stato.famSel && f[0] !== stato.famSel);
+      return `<path d="${p.d}" data-i="${i}" fill="${f[2]}" fill-opacity="${fuori ? .12 : .82}" fill-rule="evenodd" class="${stato.campoSel === i ? 'sel' : ''}"><title>${esc(p.c.nome)}</title></path>`; }).join('')}</svg>`;
 }
 function pagCampi() {
   const campi = window.CAMPI_VERI || [], lv = dati('campi/riepilogo/lavori');
@@ -232,8 +240,8 @@ function pagCampi() {
     <div class="pl-mappa" style="margin-top:10px">${svgMappa()}
       <div class="zoom"><button type="button" data-zoom="0.7" aria-label="Ingrandisci">+</button><button type="button" data-zoom="1.45" aria-label="Rimpicciolisci">−</button><button type="button" data-zoom="0" aria-label="Vista intera" style="font-size:14px">⤢</button></div>
       ${sel ? `<div class="info"><b>${esc(sel.nome)}</b><br><span style="color:var(--mut)">${esc(sel.coltura || 'coltura non indicata')} · ${nf(sel.ettari, 2)} ha</span></div>` : ''}</div>
-    <div class="pl-legenda">${fam.map(x => `<span style="--c:${x.f[2]}">${esc(x.f[3])}</span>`).join('')}</div>
-    <p class="pl-nota">Tocca un campo per il nome. Due dita o rotella per ingrandire, trascina per spostare. Nord in alto.</p>`, 'campi/campi/tutti');
+    <div class="pl-legenda">${fam.map(x => `<button type="button" class="pl-leg ${stato.famSel === x.f[0] ? 'on' : ''}" data-fam="${x.f[0]}" style="--c:${x.f[2]}">${esc(x.f[3])}</button>`).join('')}</div>
+    <p class="pl-nota">Tocca un campo per il nome, una coltura qui sopra per evidenziarla. Due dita o rotella per ingrandire, trascina per spostare. Nord in alto.</p>`, 'campi/campi/tutti');
   h += `<div class="pl-griglia">` + carta('Colture', `<div class="pl-barre">${fam.map(x => `<div class="pl-barra"><span>${esc(x.f[3])} <small style="color:var(--fioco)">${x.n}</small></span>
       <i style="--acc-c:${x.f[2]};width:${Math.max(3, x.ha / maxHa * 100)}%"></i><span class="v">${nf(x.ha, 1)} ha</span></div>`).join('')}</div>`);
   if (lv) h += carta('Lavori', (lv.da_fare && lv.da_fare.length ? `<div class="pl-elenco">${lv.da_fare.slice(0, 8).map(o => riga({ lv: o.data && o.data < oggiISO() ? 'at' : 'info',
@@ -307,7 +315,9 @@ function pagAuto() {
 const notizia = a => `<a class="pl-notizia" ${a.link && /^https:\/\//.test(a.link) ? `href="${esc(a.link)}" target="_blank" rel="noopener noreferrer"` : ''}><b>${esc(a.titolo)}</b><span>${esc([a.fonte, a.argomento, a.data ? gm(a.data) : ''].filter(Boolean).join(' · '))}</span>${a.testo ? `<p>${esc(a.testo)}</p>` : ''}</a>`;
 function pagNotizie() {
   const no = dati('costrutto/riepilogo/notizie'); if (!no) return carta('Notizie', nienteDati('delle notizie'));
-  return carta('Notizie del ' + esc(gma(no.giorno)), (no.articoli || []).map(notizia).join(''), 'costrutto/riepilogo/notizie') + '<p class="pl-nota">Raccolte dal gestionale. Si aprono sul sito della fonte.</p>';
+  const args = [...new Set((no.articoli || []).map(a => a.argomento).filter(Boolean))].sort();
+  const lista = (no.articoli || []).filter(a => !stato.argNot || a.argomento === stato.argNot);
+  return carta('Notizie del ' + esc(gma(no.giorno)), (args.length > 1 ? `<div class="pl-chip-riga" style="margin-bottom:6px"><button type="button" class="pl-chip ${!stato.argNot ? 'on' : ''}" data-arg="">Tutte</button>${args.map(a => `<button type="button" class="pl-chip ${stato.argNot === a ? 'on' : ''}" data-arg="${esc(a)}">${esc(a)}</button>`).join('')}</div>` : '') + lista.map(notizia).join(''), 'costrutto/riepilogo/notizie') + '<p class="pl-nota">Raccolte dal gestionale. Si aprono sul sito della fonte.</p>';
 }
 function pagAutomazioni() {
   const au = dati('azienda/riepilogo/automazioni'); if (!au) return carta('Automazioni', nienteDati('delle automazioni'));
@@ -364,6 +374,7 @@ function apriMenu() {
     <div class="pl-elenco">${voce('mercati', 'Mercati', 'prezzi di latte, mais, soia, concimi, gasolio')}${voce('auto', 'Auto', 'scadenze e lavori del libretto')}
     ${voce('notizie', 'Notizie', 'la rassegna del giorno')}${voce('automazioni', 'Automazioni', 'cosa fa da solo il gestionale', 'ingranaggio')}
     <button type="button" class="pl-riga" data-azione="3d">${ic('cubo')}<span class="t"><b>Costrutto 3D</b><span>la stalla e i campi in 3D</span></span>${ic('freccia')}</button>
+    ${installa && !installata() ? `<button type="button" class="pl-riga" data-azione="installa">${ic('scarica')}<span class="t"><b>Installa la Matrix</b><span>come un programma: si apre con un’icona, a tutto schermo</span></span></button>` : ''}
     <button type="button" class="pl-riga" data-azione="testo">${ic('testo')}<span class="t"><b>Testo: ${grande() ? 'grande' : 'normale'}</b><span>tocca per cambiare la grandezza delle scritte</span></span></button>
     <button type="button" class="pl-riga" data-azione="tema">${ic('sole')}<span class="t"><b>Colori: ${NOMI_TEMA[tema()]}</b><span>tocca per cambiare (automatico, chiaro, scuro)</span></span></button>
     <button type="button" class="pl-riga" data-azione="aggiorna">${ic('giri')}<span class="t"><b>Aggiorna i dati</b><span>rilegge i riassunti dal server</span></span></button>
@@ -447,12 +458,15 @@ export function avviaPlancia(o) {
     if (a) { e.preventDefault(); chiudiFoglio();
       if (a.dataset.azione === '3d') opz.apri3d();
       if (a.dataset.azione === 'cerca') apriCerca();
+      if (a.dataset.azione === 'installa' && installa) { installa.prompt(); try { const r = await installa.userChoice; if (r.outcome === 'accepted') avviso('Matrix installata'); } catch (_) { } installa = null; }
       if (a.dataset.azione === 'testo') { try { localStorage.setItem('matrix-testo', grande() ? 'normale' : 'grande'); } catch (_) { } applicaTesto(); apriMenu(); }
       if (a.dataset.azione === 'tema') { const t = TEMI[(TEMI.indexOf(tema()) + 1) % TEMI.length]; try { localStorage.setItem('matrix-tema', t); } catch (_) { } applicaTema(); apriMenu(); }
       if (a.dataset.azione === 'aggiorna') { a.disabled = true; try { const ok = await opz.aggiorna(); MAPPA = null; disegna(); avviso(ok ? 'Dati aggiornati' : 'Non riesco a leggere i dati: controlla la rete'); } finally { a.disabled = false; } }
       return; }
     if (v) return vai(v.dataset.vai);
     if (c) { stato.catMag = c.dataset.cat; return disegna(); }
+    const fm = e.target.closest('[data-fam]'); if (fm) { stato.famSel = stato.famSel === fm.dataset.fam ? '' : fm.dataset.fam; return disegna(); }
+    const ag = e.target.closest('[data-arg]'); if (ag) { stato.argNot = ag.dataset.arg; return disegna(); }
     const od = e.target.closest('[data-ord]'); if (od) { stato.ordMag = od.dataset.ord; return disegna(); }
     if (cm) { chiudiFoglio(); return vai('campi'), apriCampo(cm.dataset.campo); }
     const mc = e.target.closest('[data-mercato]'); if (mc) return apriMercato(+mc.dataset.mercato);
