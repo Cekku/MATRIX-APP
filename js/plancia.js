@@ -196,6 +196,9 @@ function pagStalla() {
     + (K ? carta('Ultimo controllo funzionale · ' + esc(gma(K.data)), `<div class="pl-elenco">${[
       { t: 'Vacche controllate', v: nf(K.capi) }, { t: 'Latte a capo', v: nf(K.kg, 1) + ' kg' }, { t: 'Grasso', v: nf(K.grasso, 2) + '%' },
       { t: 'Proteine', v: nf(K.proteine, 2) + '%' }, { t: 'Cellule (media)', v: nf(K.cellule) + ' mila', lv: K.cellule > 300 ? 'at' : '' }].map(x => riga(x, false)).join('')}</div>`) : '')
+    + (Array.isArray(st.controlli) && st.controlli.length >= 2 ? carta('Andamento dei controlli', `<h2 style="margin-top:2px">Latte a capo (kg)</h2>${lineaSvg(st.controlli.map(c => [c.data, c.kg]), { dec: 1, unita: ' kg', etichette: st.controlli.map((c, i) => [i, gm(c.data)]).filter((_, i, l) => i % Math.ceil(l.length / 5) === 0) })}
+      <h2 style="margin-top:10px">Cellule (mila)</h2>${lineaSvg(st.controlli.map(c => [c.data, c.cellule]), { etichette: st.controlli.map((c, i) => [i, gm(c.data)]).filter((_, i, l) => i % Math.ceil(l.length / 5) === 0) })}
+      <p class="pl-nota">Medie della mandria agli ultimi ${st.controlli.length} controlli funzionali. Scorri sui grafici per leggere i valori.</p>`) : '')
     + `</div>`;
   return h;
 }
