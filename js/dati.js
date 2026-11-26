@@ -1,16 +1,22 @@
 // Dati veri, solo dopo il login: li legge da Supabase MATRIX (privato). Se mancano, il Costrutto usa quelli finti.
 // - campi: una voce (mondo 'campi', tipo 'campi') con nome, coltura, superficie e confine
+// - stalla: una voce (mondo 'azienda', tipo 'riepilogo', id 'stalla') con soli conteggi e medie
 // - modello 3D: file privato nello spazio 'modelli', tenuto in una copia sul dispositivo finché non cambia
 
 const SPAZIO = 'modelli', MODELLO = 'stalla.glb', COPIA = 'copia-modelli';
 
-export async function caricaCampi(db) {
+// Campi e numeri della stalla in una sola richiesta. Restano solo in memoria: niente sul dispositivo.
+export async function caricaDati(db) {
   try {
-    const { data, error } = await db.from('voci').select('dati')
-      .eq('mondo', 'campi').eq('tipo', 'campi').eq('id', 'tutti').maybeSingle();
-    const campi = !error && data && data.dati && data.dati.campi;
+    const { data, error } = await db.from('voci').select('mondo,tipo,id,dati')
+      .or('and(mondo.eq.campi,tipo.eq.campi,id.eq.tutti),and(mondo.eq.azienda,tipo.eq.riepilogo,id.eq.stalla)');
+    if (error || !data) return;
+    const voce = (m, t) => (data.find(v => v.mondo === m && v.tipo === t) || {}).dati;
+    const campi = (voce('campi', 'campi') || {}).campi;
     if (Array.isArray(campi) && campi.length) window.CAMPI_VERI = campi;
-  } catch (_) { /* senza rete: campi finti */ }
+    const stalla = voce('azienda', 'riepilogo');
+    if (stalla && stalla.latte && stalla.capi) window.STALLA_VERA = stalla;
+  } catch (_) { /* senza rete: dati finti */ }
 }
 
 // Promessa dell'indirizzo del modello: il Costrutto la aspetta solo quando apre il mondo Azienda.

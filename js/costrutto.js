@@ -206,6 +206,33 @@ if (FONTI.campi){
     DETT[c.id] = [c.nome, c.coltura || 'campo', [['Coltura', c.coltura || 'non indicata'], ['Superficie', c.ettari ? numIt(c.ettari, 2) + ' ha' : '—'], ['Dove', doveCampo(c)]],
       'Dal gestionale, in sola lettura.']; });
 }
+// con i numeri veri della stalla (solo conteggi e medie, li scrive il PC): via la vacca finta, dentro i numeri
+if (window.STALLA_VERA){ (function(){
+  const S = window.STALLA_VERA, L = S.latte || {}, C = S.capi || {}, K = S.controllo, n = k => +C[k] || 0;
+  const gm = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '—', litri = v => v == null ? '—' : numIt(v, 0) + ' L';
+  const vacche = n('lattazione') + n('asciutta'), aCapo = L.litri && n('lattazione') ? L.litri / n('lattazione') : null;
+  const vecchio = L.ultimo_giorno ? Math.round((Date.now() - new Date(L.ultimo_giorno)) / 864e5) : 0;
+  const pct = (a, b) => a && b ? Math.max(5, Math.min(100, a / b * 100)) : 50;
+  for (let i = DA_GUARDARE.length - 1; i >= 0; i--) if (/vacca 214/i.test(DA_GUARDARE[i][3])) DA_GUARDARE.splice(i, 1);
+  if (n('da_fecondare')) DA_GUARDARE.unshift(['azienda','stalla','Azienda', n('da_fecondare') + ' vacche da fecondare (oltre 50 giorni dal parto)','Gestionale · stalla','at']);
+  if (n('parti_30gg')) DA_GUARDARE.push(['azienda','stalla','Azienda', n('parti_30gg') + ' parti previsti nei prossimi 30 giorni','Gestionale · stalla','']);
+  if (vecchio > 2) DA_GUARDARE.unshift(['azienda','sala','Azienda','Latte registrato fino al ' + gm(L.ultimo_giorno) + ': da aggiornare','Gestionale · latte','at']);
+  STRISCIA.azienda[1][0] = ['Capi in lattazione', numIt(n('lattazione'), 0), pct(n('lattazione'), vacche)];
+  STRISCIA.azienda[1][1] = ['Latte ' + gm(L.ultimo_giorno), litri(L.litri), pct(L.litri, L.media30 * 1.15), vecchio > 2 ? 'at' : ''];
+  STRISCIA.stalla = ['Stalla', [['In lattazione', numIt(n('lattazione'), 0), pct(n('lattazione'), vacche)], ['In asciutta', numIt(n('asciutta'), 0), pct(n('asciutta'), vacche)],
+    ['Gravide', numIt(n('gravide'), 0), pct(n('gravide'), vacche)], ['Da fecondare', numIt(n('da_fecondare'), 0), pct(n('da_fecondare'), vacche), n('da_fecondare') ? 'at' : '']]];
+  STRISCIA.sala = ['Latte', [['Latte ' + gm(L.ultimo_giorno), litri(L.litri), pct(L.litri, L.media30 * 1.15)], ['Media a capo', aCapo ? numIt(aCapo) + ' L' : '—', pct(aCapo, 45)],
+    ['Media 30 giorni', litri(L.media30), pct(L.media30, L.media30 * 1.15)]]];
+  DETT.stalla = ['Stalla', vacche + ' vacche · dati al ' + gm(L.ultimo_giorno), [['In lattazione', numIt(n('lattazione'), 0)], ['In asciutta', numIt(n('asciutta'), 0)],
+    ['Gravide', numIt(n('gravide'), 0), 'ok'], ['Da fecondare', numIt(n('da_fecondare'), 0), n('da_fecondare') ? 'at' : 'ok'], ['Parti nei prossimi 30 giorni', numIt(n('parti_30gg'), 0)],
+    ...(K ? [['Ultimo controllo (' + gm(K.data) + ')', numIt(K.kg) + ' kg a capo'], ['Grasso · proteine', numIt(K.grasso, 2) + '% · ' + numIt(K.proteine, 2) + '%'], ['Cellule (media)', numIt(K.cellule, 0) + ' mila']] : [])],
+    'Dal gestionale, in sola lettura: solo numeri, nessuna vacca per nome.'];
+  DETT.sala = ['Latte', 'registrato fino al ' + gm(L.ultimo_giorno), [['Ultimo giorno', litri(L.litri)], ['Conferiti', litri(L.conferiti)], ['Media a capo', aCapo ? numIt(aCapo) + ' L' : '—'],
+    ['Media 7 giorni', litri(L.media7)], ['Media 30 giorni', litri(L.media30)], ['Stesso mese un anno fa', litri(L.media30_anno_prima), L.media30 >= L.media30_anno_prima ? 'ok' : 'at']],
+    'Dal gestionale, in sola lettura.'];
+  const r = RISP.find(x => x[0].test('latte')); if (r){ r[1] = 'Il ' + gm(L.ultimo_giorno) + ' ' + litri(L.litri) + (aCapo ? ', ' + numIt(aCapo) + ' a capo' : '') + '. Media degli ultimi 30 giorni ' + litri(L.media30) + '.'; r[2] = 'Gestionale · latte'; }
+  const nodo = GRAFO_VITA.nodi.find(x => x[0] === 'stalla'); if (nodo){ nodo[5] = numIt(n('lattazione'), 0) + ' in lattazione'; nodo[6] = n('da_fecondare') ? 'at' : ''; }
+})(); }
 /** Un campo citato nella domanda ("dov'è il Campo Nord?") */
 function trovaCampo(q){
   const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -437,17 +464,40 @@ function luceDelGiorno(){
   E.luciNotte.forEach(s => s.visible = E.notte);
 }
 function controlli(cv){
-  let giu = false, px = 0, py = 0, mosso = 0, ultimoHover = 0;
-  cv.addEventListener('pointerdown', e => { giu = true; E.trascina = true; px = e.clientX; py = e.clientY; mosso = 0;
-    try { cv.setPointerCapture(e.pointerId); } catch (_) {} nascondiGuida(); });
+  // un dito / mouse: ruota · due dita: ingrandisci e sposta · tasto destro o Maiusc + trascina: sposta · rotella: ingrandisci
+  let giu = false, px = 0, py = 0, mosso = 0, ultimoHover = 0, sposta = false;
+  const dita = new Map(); let pinza = null;
+  const minDist = () => nordFisso(mondo) ? 3 : 3.5, maxDist = 190;
+  const zoom = f => { E.meta.dist = limita(E.meta.dist * f, minDist(), maxDist); E.auto = false; $('#indietro').hidden = false; };
+  function trasla(dx, dy){ // muove il punto guardato come una mappa sotto il dito
+    const k = E.meta.dist * .0016, s = Math.sin(E.meta.az), c = Math.cos(E.meta.az);
+    E.meta.t.x += -c * dx * k - s * dy * k; E.meta.t.z += s * dx * k - c * dy * k;
+    const r = Math.hypot(E.meta.t.x, E.meta.t.z); if (r > 80){ E.meta.t.x *= 80 / r; E.meta.t.z *= 80 / r; }
+    E.cur.t.copy(E.meta.t); E.auto = false; $('#indietro').hidden = false; }
+  const mezzo = () => { const [a, b] = [...dita.values()]; return {x:(a.x + b.x) / 2, y:(a.y + b.y) / 2, d:Math.hypot(a.x - b.x, a.y - b.y) || 1}; };
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  cv.addEventListener('pointerdown', e => {
+    dita.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {} nascondiGuida();
+    if (dita.size === 2){ pinza = mezzo(); giu = false; mosso = 99; return; }
+    if (dita.size > 2) return;
+    giu = true; E.trascina = true; px = e.clientX; py = e.clientY; mosso = 0; sposta = e.button === 2 || e.shiftKey; });
   cv.addEventListener('pointermove', e => {
+    if (dita.has(e.pointerId)) dita.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if (pinza && dita.size === 2){ const m = mezzo();
+      zoom(pinza.d / m.d); trasla(m.x - pinza.x, m.y - pinza.y); pinza = m; return; }
     if (!giu){ if (e.pointerType === 'mouse' && e.timeStamp - ultimoHover > 90){ ultimoHover = e.timeStamp; cv.style.cursor = prendi(e.clientX, e.clientY) ? 'pointer' : ''; } return; }
     const dx = e.clientX - px, dy = e.clientY - py; px = e.clientX; py = e.clientY; mosso += Math.abs(dx) + Math.abs(dy);
     if (mosso < 6) return;
+    if (sposta) return trasla(dx, dy);
     E.meta.az -= dx * .0062; E.meta.el = limita(E.meta.el + dy * .004, .16, 1.38); E.cur.az = E.meta.az; E.cur.el = E.meta.el; });
-  const su = e => { if (!giu) return; giu = false; E.trascina = false; if (mosso < 6 && e.type === 'pointerup') tocca(e.clientX, e.clientY); };
+  const su = e => { dita.delete(e.pointerId);
+    if (pinza){ if (dita.size < 2) pinza = null;
+      if (dita.size === 1){ const [d] = [...dita.values()]; px = d.x; py = d.y; giu = true; sposta = false; } // resta un dito: riprende a ruotare senza salti
+      else { giu = false; E.trascina = false; } return; }
+    if (!giu) return; giu = false; E.trascina = false; if (mosso < 6 && e.type === 'pointerup') tocca(e.clientX, e.clientY); };
   cv.addEventListener('pointerup', su); cv.addEventListener('pointercancel', su);
-  cv.addEventListener('wheel', e => { e.preventDefault(); E.meta.dist = limita(E.meta.dist * (1 + Math.sign(e.deltaY) * .09), nordFisso(mondo) ? 5 : 14, 190); nascondiGuida(); }, {passive:false});
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoom(1 + Math.sign(e.deltaY) * .12); nascondiGuida(); }, {passive:false});
 }
 function prendi(x, y){
   if (!E.G) return null;
@@ -788,7 +838,7 @@ const MODELLI = {
   scuola(k){ grafo3D(k, GRAFO_SCUOLA); },
   async azienda(k){
     if (FONTI.modelloAzienda){ try { await caricaGLB(await FONTI.modelloAzienda, k);
-        NOTA_MONDO.azienda = 'progetto 3D vero della stalla · numeri ancora finti'; try { striscia(); } catch (_) {} return; }
+        NOTA_MONDO.azienda = 'progetto 3D vero della stalla · ' + (window.STALLA_VERA ? 'stalla e latte veri, il resto finto' : 'numeri ancora finti'); try { striscia(); } catch (_) {} return; }
       catch (err) { console.warn('Modello GLB non caricato, uso quello disegnato:', err.message || err); } }
     aziendaDisegnata(k);
   },

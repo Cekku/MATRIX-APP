@@ -2,7 +2,7 @@
 import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, INDIRIZZO_APP } from './config.js';
 import { VERSIONE } from './versione.js';
 import { nativa, attivaTastoIndietro, controllaAggiornamento } from './nativo.js';
-import { caricaCampi, preparaModello, dimenticaDati } from './dati.js';
+import { caricaDati, preparaModello, dimenticaDati } from './dati.js';
 
 const $ = s => document.querySelector(s);
 // arrivo dal collegamento della mail "nuova password": lo leggo prima che Supabase pulisca l'indirizzo
@@ -35,7 +35,7 @@ async function apri(utente) {
   preparaModello(db);
   await Promise.all([
     script('vendor/three/three.min.js').catch(() => { /* il Costrutto mostra "3D non caricato" */ }),
-    caricaCampi(db),
+    caricaDati(db),
   ]);
   await script('js/costrutto.js');
   attivaTastoIndietro();
