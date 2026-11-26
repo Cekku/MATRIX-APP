@@ -31,6 +31,7 @@ const I = {
   ingranaggio: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   freccia: '<path d="M9 6l6 6-6 6"/>',
+  testo: '<path d="M4 7V5h10v2M9 5v14M7 19h4"/><path d="M14 12v-1h6v1M17 11v8M15.5 19h3"/>',
   sole: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
   cerca: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
 };
@@ -130,7 +131,8 @@ const riga = (a, conVai = true) => { const b = a.vai && conVai && /^[a-z]+$/.tes
   <span class="t"><b>${esc(a.t)}</b>${a.s ? `<span>${esc(a.s)}</span>` : ''}</span>${a.v != null ? `<span class="v">${a.v}</span>` : ''}${b ? ic('freccia') : ''}</${b ? 'button' : 'div'}>`; };
 // attenzione: `val` di kpi() e `v` di riga() entrano così come sono: solo numeri da nf() o testo già passato da esc()
 const kpi = (val, etichetta, vai, lv = '') => `<${vai ? `button type="button" data-vai="${vai}"` : 'div'} class="pl-k ${lvOk(lv)}"><b>${val}</b><span>${esc(etichetta)}</span></${vai ? 'button' : 'div'}>`;
-const nienteDati = cosa => `<p class="pl-vuoto">Nessun dato ${esc(cosa)}: arrivano quando il PC manda i riassunti.</p>`;
+const nienteDati = cosa => window.MATRIX_DATI ? `<p class="pl-vuoto">Nessun dato ${esc(cosa)}: arrivano quando il PC manda i riassunti.</p>`
+  : `<p class="pl-vuoto">Non riesco a leggere i dati: sei senza rete? Riprova con ${ic('giri').replace('<svg', '<svg style="width:14px;height:14px;vertical-align:-2px"')} in alto.</p>`;
 
 /* ------------------------------------------------------------------ OGGI */
 function pagOggi() {
@@ -140,6 +142,7 @@ function pagOggi() {
   const ha = campi.reduce((a, c) => a + (+c.ettari || 0), 0);
   const gas = mg && mg.gasolio && mg.gasolio[0];
   let h = '';
+  if (!window.MATRIX_DATI) h += carta('Senza rete', `<div class="pl-elenco">${riga({ lv: 'at', t: 'Non riesco a leggere i dati', s: 'controlla la connessione e tocca il pulsante per aggiornare in alto' }, false)}</div>`);
   h += carta('Meteo', me && me.ora ? `<div class="pl-meteo"><span class="ora">${nf(me.ora.temp, 0)}°</span>
       <span class="cielo">${CIELO(me.ora.codice)} ${esc(me.ora.cielo)}<span>umidità ${nf(me.ora.umidita)}% · vento ${nf(me.ora.vento)} km/h</span></span></div>
       <div class="pl-giorni">${(me.giorni || []).slice(0, 5).map((g, i) => { const d = new Date(g.data + 'T12:00');
@@ -149,6 +152,13 @@ function pagOggi() {
     ${kpi(nf(C.lattazione), 'vacche in lattazione', 'stalla')}${kpi(nf(ha, 1) + ' ha', campi.length + ' campi', 'campi')}
     ${gas ? kpi(nf(gas.g) + ' ' + esc(gas.u), gas.nome.toLowerCase(), 'magazzino', gas.g < 0 ? 'bad' : '') : ''}</div>`;
   h += carta('Da guardare' + (av.length ? ` · ${av.length}` : ''), av.length ? `<div class="pl-elenco">${av.map(a => riga(a)).join('')}</div>` : '<p class="pl-vuoto">Niente da guardare. Tutto a posto.</p>');
+  const mer = dati('azienda/riepilogo/mercati'), lv = dati('campi/riepilogo/lavori');
+  const latteP = ((mer && mer.prezzi) || []).filter(p => p.gruppo === 'latte' && p.ultimo);
+  if (latteP.length || (lv && lv.ultimi && lv.ultimi.length)) h += `<div class="pl-griglia">`
+    + (latteP.length ? carta('Prezzo del latte', `<div class="pl-elenco">${latteP.slice(0, 3).map(p => { const d = p.prima ? (p.ultimo[1] - p.prima[1]) / p.prima[1] * 100 : null;
+        return `<button type="button" class="pl-riga" data-mercato="${mer.prezzi.indexOf(p)}"><span class="t"><b>${esc(p.nome)}</b><span>${esc(p.u)}</span></span><span class="v">${nf(p.ultimo[1], 2)}${d != null ? `<small class="${Math.abs(d) < .05 ? 'fermo' : d > 0 ? 'su' : 'giu'}">${Math.abs(d) < .05 ? '=' : (d > 0 ? '▲ ' : '▼ ') + nf(Math.abs(d), 1) + '%'}</small>` : ''}</span></button>`; }).join('')}</div>`, 'azienda/riepilogo/mercati') : '')
+    + (lv && lv.ultimi && lv.ultimi.length ? carta('Ultimi lavori nei campi', `<div class="pl-elenco">${lv.ultimi.slice(0, 3).map(o => riga({ t: o.tipo + (o.campo ? ' · ' + o.campo : ''), s: [gma(o.data), o.mezzo].filter(Boolean).join(' · '), vai: 'campi' })).join('')}</div>`, 'campi/riepilogo/lavori') : '')
+    + `</div>`;
   if (no && no.articoli && no.articoli.length) h += carta('Notizie del ' + esc(gm(no.giorno)), no.articoli.slice(0, 3).map(notizia).join('') +
     `<button type="button" class="pl-btn" data-vai="notizie" style="margin-top:8px">Tutte le notizie ${ic('freccia')}</button>`, 'costrutto/riepilogo/notizie');
   h += `<button type="button" class="pl-btn" data-azione="3d" style="justify-self:start">${ic('cubo')} Apri il Costrutto 3D</button>`;
@@ -354,6 +364,7 @@ function apriMenu() {
     <div class="pl-elenco">${voce('mercati', 'Mercati', 'prezzi di latte, mais, soia, concimi, gasolio')}${voce('auto', 'Auto', 'scadenze e lavori del libretto')}
     ${voce('notizie', 'Notizie', 'la rassegna del giorno')}${voce('automazioni', 'Automazioni', 'cosa fa da solo il gestionale', 'ingranaggio')}
     <button type="button" class="pl-riga" data-azione="3d">${ic('cubo')}<span class="t"><b>Costrutto 3D</b><span>la stalla e i campi in 3D</span></span>${ic('freccia')}</button>
+    <button type="button" class="pl-riga" data-azione="testo">${ic('testo')}<span class="t"><b>Testo: ${grande() ? 'grande' : 'normale'}</b><span>tocca per cambiare la grandezza delle scritte</span></span></button>
     <button type="button" class="pl-riga" data-azione="tema">${ic('sole')}<span class="t"><b>Colori: ${NOMI_TEMA[tema()]}</b><span>tocca per cambiare (automatico, chiaro, scuro)</span></span></button>
     <button type="button" class="pl-riga" data-azione="aggiorna">${ic('giri')}<span class="t"><b>Aggiorna i dati</b><span>rilegge i riassunti dal server</span></span></button>
     <button type="button" class="pl-riga" data-esci>${ic('esci')}<span class="t"><b>Esci dalla Matrix</b><span>chiude l’accesso su questo dispositivo</span></span></button></div>`);
@@ -413,12 +424,14 @@ function collegaMappa() {
 const TEMI = ['auto', 'chiaro', 'scuro'], NOMI_TEMA = { auto: 'automatici', chiaro: 'chiari', scuro: 'scuri' };
 const tema = () => { try { const t = localStorage.getItem('matrix-tema'); return TEMI.includes(t) ? t : 'auto'; } catch (_) { return 'auto'; } };
 const chiaroSistema = matchMedia('(prefers-color-scheme: light)');
+const grande = () => { try { return localStorage.getItem('matrix-testo') === 'grande'; } catch (_) { return false; } };
+function applicaTesto() { document.body.classList.toggle('testo-grande', grande()); }
 function applicaTema() { const t = tema(); document.body.classList.toggle('tema-chiaro', t === 'chiaro' || (t === 'auto' && chiaroSistema.matches)); }
 
 /* ------------------------------------------------------------------ avvio */
 export function avviaPlancia(o) {
   opz = o; // {apri3d(), aggiorna()}
-  applicaTema(); chiaroSistema.addEventListener('change', applicaTema);
+  applicaTema(); applicaTesto(); chiaroSistema.addEventListener('change', applicaTema);
   const p = document.createElement('main'); p.id = 'plancia';
   p.innerHTML = `<div class="pl-testa" role="banner"><h1 id="pl-titolo"></h1>
       <button type="button" class="pl-btn" data-azione="cerca" title="Cerca" aria-label="Cerca in tutta la Matrix">${ic('cerca')}</button>
@@ -434,8 +447,9 @@ export function avviaPlancia(o) {
     if (a) { e.preventDefault(); chiudiFoglio();
       if (a.dataset.azione === '3d') opz.apri3d();
       if (a.dataset.azione === 'cerca') apriCerca();
+      if (a.dataset.azione === 'testo') { try { localStorage.setItem('matrix-testo', grande() ? 'normale' : 'grande'); } catch (_) { } applicaTesto(); apriMenu(); }
       if (a.dataset.azione === 'tema') { const t = TEMI[(TEMI.indexOf(tema()) + 1) % TEMI.length]; try { localStorage.setItem('matrix-tema', t); } catch (_) { } applicaTema(); apriMenu(); }
-      if (a.dataset.azione === 'aggiorna') { a.disabled = true; try { await opz.aggiorna(); MAPPA = null; disegna(); } finally { a.disabled = false; } }
+      if (a.dataset.azione === 'aggiorna') { a.disabled = true; try { const ok = await opz.aggiorna(); MAPPA = null; disegna(); avviso(ok ? 'Dati aggiornati' : 'Non riesco a leggere i dati: controlla la rete'); } finally { a.disabled = false; } }
       return; }
     if (v) return vai(v.dataset.vai);
     if (c) { stato.catMag = c.dataset.cat; return disegna(); }
@@ -465,6 +479,10 @@ export function avviaPlancia(o) {
   document.addEventListener('keydown', ({ key }) => { if (key === 'Escape' && !document.body.classList.contains('vista-3d')) chiudiFoglio(); });
   const h = location.hash.slice(1); if (PAGINE[h]) stato.scheda = h;
   disegna();
+}
+function avviso(testo) {
+  let t = $('#pl-avviso'); if (!t) { t = document.createElement('div'); t.id = 'pl-avviso'; t.setAttribute('role', 'status'); $('#plancia').appendChild(t); }
+  t.textContent = testo; t.classList.add('su'); clearTimeout(avviso.t); avviso.t = setTimeout(() => t.classList.remove('su'), 2600);
 }
 function ridisegnaTenendoFuoco(id) {
   const el = $('#' + id), pos = el ? el.selectionStart : null; disegna();
