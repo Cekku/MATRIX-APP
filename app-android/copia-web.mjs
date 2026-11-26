@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const qui = dirname(fileURLToPath(import.meta.url));
 const sito = join(qui, '..'), www = join(qui, 'www');
-const DA_COPIARE = ['index.html', 'manifest.webmanifest', 'js', 'icons', 'vendor'];
+const DA_COPIARE = ['index.html', 'manifest.webmanifest', 'js', 'css', 'icons', 'vendor'];
 
 rmSync(www, { recursive: true, force: true });
 mkdirSync(www);

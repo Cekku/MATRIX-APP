@@ -16,6 +16,10 @@ Lingua: **italiano semplice**, niente gergo.
 - Legge solo da Supabase MATRIX. Non parla mai direttamente con il gestionale dell'azienda.
 - Librerie esterne copiate in `vendor/`, non da CDN.
 - Pubblicata su GitHub Pages.
+- Dopo il login si apre la **plancia** (`js/plancia.js`, `css/plancia.css`): schermata leggera con i riassunti che il PC
+  scrive su Supabase MATRIX (`js/dati.js` li legge tutti in `window.MATRIX_DATI`). Il Costrutto 3D (`index.html` e
+  `js/costrutto.js`, generati da `porta_v6.py` del repository privato) si carica solo quando lo si apre.
+- Nomi delle classi della plancia con `pl-`: il CSS del Costrutto usa nomi generici (`header`, `.testa`, `.riga`, `.sotto`...).
 
 ## App Android (APK)
 - Capacitor 8.5.3 in `app-android/` (solo plugin App). L'APK contiene una copia dei file del sito (`copia-web.mjs`, niente `sw.js`).

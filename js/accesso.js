@@ -3,6 +3,7 @@ import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, INDIRIZZO_APP } from './config.
 import { VERSIONE } from './versione.js';
 import { nativa, attivaTastoIndietro, controllaAggiornamento } from './nativo.js';
 import { caricaDati, preparaModello, dimenticaDati } from './dati.js';
+import { avviaPlancia, disegna, mostra3d } from './plancia.js';
 
 const $ = s => document.querySelector(s);
 // arrivo dal collegamento della mail "nuova password": lo leggo prima che Supabase pulisca l'indirizzo
@@ -31,14 +32,31 @@ let aperto = false;
 async function apri(utente) {
   if (aperto) return; aperto = true;
   window.MATRIX_NOME = nomeDa(utente);
+  $('#entra').hidden = true; $('#nuova-pw').hidden = true; $('#attesa').hidden = false; $('#attesa').textContent = 'Carico i dati…';
+  await caricaDati(db);
   document.body.classList.remove('chiuso');
-  preparaModello(db);
-  await Promise.all([
-    script('vendor/three/three.min.js').catch(() => { /* il Costrutto mostra "3D non caricato" */ }),
-    caricaDati(db),
-  ]);
-  await script('js/costrutto.js');
+  avviaPlancia({ apri3d, aggiorna: () => caricaDati(db) });
   attivaTastoIndietro();
+  let vista = 'plancia'; try { vista = localStorage.getItem('matrix-vista') || 'plancia'; } catch (_) { }
+  if (vista === '3d') apri3d();
+  // tornando sull'app dopo un po', rilegge i riassunti
+  let letto = Date.now();
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || Date.now() - letto < 10 * 60e3) return;
+    letto = Date.now(); if (await caricaDati(db)) disegna();
+  });
+}
+
+// Il Costrutto 3D si carica solo la prima volta che lo si apre (sul telefono pesa: three.js e il modello della stalla)
+let costrutto3d = null;
+function apri3d() {
+  mostra3d();
+  if (!costrutto3d) costrutto3d = (async () => {
+    preparaModello(db);
+    try { await script('vendor/three/three.min.js'); } catch (_) { /* il Costrutto mostra "3D non caricato" */ }
+    await script('js/costrutto.js');
+  })();
+  return costrutto3d;
 }
 
 // nell'APK: all'apertura guarda se su GitHub c'è una versione più nuova
@@ -92,7 +110,7 @@ $('#nuova-pw').addEventListener('submit', async e => {
 
 // "Esci": chiude la sessione e ricarica la pagina (così del Costrutto non resta niente in memoria)
 document.addEventListener('click', async e => {
-  if (!e.target.closest('#esci')) return;
+  if (!e.target.closest('#esci, [data-esci]')) return;
   await dimenticaDati();
   await db.auth.signOut();
   location.reload();

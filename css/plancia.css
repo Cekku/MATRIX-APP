@@ -1,0 +1,120 @@
+/* La plancia: la schermata principale, leggera e comoda sul telefono. Il 3D (Costrutto) si apre a richiesta.
+   Stessi colori del Costrutto: fondo scuro neutro, verde per le cose a posto, giallo e rosso solo per quelle da guardare. */
+#plancia{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--fondo);color:var(--tx);
+  font:15px/1.45 var(--sans)}
+body.vista-3d #plancia{display:none}
+body:not(.vista-3d) #costrutto{display:none}
+#plancia .pl-testa{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;
+  border-bottom:1px solid var(--linea);background:var(--vetro-forte)}
+#plancia .pl-testa h1{margin:0;font:600 18px var(--sans);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#plancia .pl-testa h1 small{display:block;font:400 12px var(--sans);color:var(--mut)}
+.pl-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;min-width:40px;padding:0 12px;
+  border-radius:12px;border:1px solid var(--linea-forte);background:transparent;color:var(--tx);cursor:pointer;font:500 14px var(--sans)}
+.pl-btn:hover{background:rgba(255,255,255,.06)}
+.pl-btn.pieno{background:var(--ok);border-color:var(--ok);color:#10241a;font-weight:600}
+.pl-btn svg,.pl-nav svg,.pl-riga svg{width:20px;height:20px;flex:none}
+.pl-corpo{order:2;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.pl-pagina{max-width:1080px;margin:0 auto;padding:16px 16px calc(96px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
+.pl-griglia{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.pl-carta{background:#212730;border:1px solid var(--linea);border-radius:16px;padding:14px 16px;min-width:0}
+.pl-carta h2{margin:0 0 10px;font:600 13px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mut);
+  display:flex;align-items:center;gap:8px}
+.pl-carta h2 .agg{margin-left:auto;font:400 11px var(--sans);letter-spacing:0;text-transform:none;color:var(--fioco)}
+.pl-nota{margin:8px 0 0;font-size:12px;color:var(--fioco)}
+.pl-vuoto{color:var(--mut);font-size:14px;margin:0}
+/* numeri grandi */
+.pl-kpi{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.pl-k{padding:12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--linea);min-width:0;text-align:left;
+  color:inherit;font:inherit;cursor:pointer}
+.pl-k b{display:block;font:600 22px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-k span{display:block;font-size:12px;color:var(--mut)}
+.pl-k.at{border-color:rgba(255,197,61,.55)} .pl-k.at b{color:var(--warn)}
+.pl-k.bad{border-color:rgba(255,90,106,.6)} .pl-k.bad b{color:var(--red)}
+/* righe di elenco */
+.pl-elenco{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.pl-riga{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--linea);min-width:0;
+  background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left;color:inherit;font:inherit}
+button.pl-riga{cursor:pointer} button.pl-riga:hover{background:rgba(255,255,255,.04)}
+.pl-riga:last-child{border-bottom:0}
+.pl-riga .t{flex:1;min-width:0}
+.pl-riga .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.pl-riga .t span{display:block;font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis}
+.pl-riga .v{font:500 14px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.pl-riga .v small{display:block;font:400 11px var(--sans);color:var(--fioco)}
+.pl-punto{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ok)}
+.pl-punto.at{background:var(--warn)} .pl-punto.bad{background:var(--red)} .pl-punto.info{background:var(--blu)}
+.su{color:var(--ok)} .giu{color:var(--red)} .fermo{color:var(--mut)}
+.at-t{color:var(--warn)} .bad-t{color:var(--red)}
+/* meteo */
+.pl-meteo{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pl-meteo .ora{font:600 34px var(--mono)}
+.pl-meteo .cielo{font-size:15px} .pl-meteo .cielo span{display:block;font-size:12px;color:var(--mut)}
+.pl-giorni{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}
+.pl-giorni div{text-align:center;padding:8px 2px;border-radius:12px;background:rgba(255,255,255,.04);font-size:12px;color:var(--mut)}
+.pl-giorni b{display:block;color:var(--tx);font:500 13px var(--mono)}
+.pl-giorni .ic{font-size:18px;line-height:1.4;display:block}
+/* grafici */
+.pl-grafico{width:100%;height:auto;display:block;margin-top:4px}
+.pl-grafico text{fill:var(--mut);font:19px var(--sans)}
+/* barre per coltura */
+.pl-barre{display:grid;gap:8px}
+.pl-barra{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;align-items:center;gap:10px;font-size:13px}
+.pl-barra i{display:block;height:10px;border-radius:6px;background:var(--acc-c,var(--ok))}
+.pl-barra .v{font:500 13px var(--mono);color:var(--mut)}
+/* filtri */
+.pl-cerca{width:100%;font:400 16px var(--sans);color:var(--tx);background:rgba(0,0,0,.25);border:1px solid var(--linea-forte);
+  border-radius:12px;padding:11px 12px}
+.pl-cerca:focus{outline:2px solid var(--ok);outline-offset:1px}
+.pl-chip-riga{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.pl-chip{flex:none;padding:7px 12px;border-radius:999px;border:1px solid var(--linea-forte);background:transparent;color:var(--mut);
+  font:500 13px var(--sans);cursor:pointer;min-height:36px}
+.pl-chip.on{background:var(--tx);color:var(--fondo);border-color:var(--tx)}
+/* mappa dei campi */
+.pl-mappa{position:relative;border-radius:14px;overflow:hidden;background:#151a20;border:1px solid var(--linea);touch-action:none}
+.pl-mappa svg{display:block;width:100%;height:min(62vh,520px);cursor:grab}
+.pl-mappa path{stroke:rgba(0,0,0,.55);stroke-width:.6;vector-effect:non-scaling-stroke;cursor:pointer}
+.pl-mappa path.sel{stroke:#fff;stroke-width:2.2}
+.pl-mappa .zoom{position:absolute;right:10px;top:10px;display:grid;gap:6px}
+.pl-mappa .zoom button{width:40px;height:40px;border-radius:10px;border:1px solid var(--linea-forte);background:var(--vetro-forte);
+  color:var(--tx);font:600 20px var(--sans);cursor:pointer}
+.pl-mappa .info{position:absolute;left:10px;right:60px;top:10px;padding:10px 12px;border-radius:12px;background:var(--vetro-forte);
+  border:1px solid var(--linea-forte);font-size:14px}
+.pl-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--mut)}
+.pl-legenda span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--c)}
+/* navigazione: in basso sul telefono, a sinistra sul PC */
+.pl-nav{order:3;display:flex;border-top:1px solid var(--linea);background:#1e242c;padding-bottom:env(safe-area-inset-bottom,0px)}
+.pl-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 9px;background:none;border:0;
+  color:var(--fioco);font:500 11px var(--sans);cursor:pointer;min-height:56px}
+.pl-nav button.on{color:var(--tx)}
+.pl-nav button.on svg{color:var(--ok)}
+.pl-nav button{position:relative}
+.pl-nav .bollo{position:absolute;top:4px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;
+  background:var(--warn);color:#2a2000;font:700 10px/16px var(--sans)}
+@media (min-width:900px){
+  #plancia{display:grid;grid-template-columns:210px 1fr;grid-template-rows:auto minmax(0,1fr)}
+  #plancia .pl-testa{grid-column:1/-1;grid-row:1}
+  .pl-nav{grid-column:1;grid-row:2;flex-direction:column;overflow-y:auto;border-top:0;border-right:1px solid var(--linea);padding:10px 8px;gap:2px}
+  .pl-nav button{flex:none;flex-direction:row;gap:12px;padding:10px 12px;border-radius:10px;font-size:14px;min-height:44px;justify-content:flex-start}
+  .pl-nav button.on{background:rgba(255,255,255,.07)}
+  .pl-nav .bollo{position:static;margin:0 0 0 auto}
+  .pl-corpo{grid-column:2;grid-row:2}
+  .pl-pagina{padding-bottom:32px}
+}
+/* foglio che sale dal basso (dettagli e menu) */
+.pl-velo{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center}
+.pl-foglio{width:min(560px,100%);max-height:86vh;overflow:auto;background:#222831;border:1px solid var(--linea-forte);
+  border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.4)}
+@media (min-width:900px){.pl-velo{align-items:center}.pl-foglio{border-radius:18px}}
+.pl-foglio h3{margin:0 0 4px;font:600 18px var(--sans)}
+.pl-foglio .pl-sotto{margin:0 0 12px;color:var(--mut);font-size:13px}
+.pl-foglio .pl-chiudi{float:right}
+/* ritorno dal 3D */
+#torna-plancia{position:fixed;z-index:20;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  display:none}
+body.vista-3d #torna-plancia{display:inline-flex}
+@media (max-width:899px){ body.vista-3d #torna-plancia{bottom:auto;top:calc(70px + env(safe-area-inset-top,0px))} }
+.pl-notizia{display:block;padding:12px 4px;border-bottom:1px solid var(--linea);color:inherit;text-decoration:none}
+.pl-notizia:last-child{border-bottom:0}
+.pl-notizia b{display:block;font-weight:500;line-height:1.35}
+.pl-notizia span{display:block;font-size:12px;color:var(--mut);margin-top:3px}
+.pl-notizia p{margin:4px 0 0;font-size:13px;color:var(--mut);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

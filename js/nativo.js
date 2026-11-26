@@ -9,6 +9,8 @@ const RILASCI = 'https://github.com/Cekku/MATRIX-APP/releases/latest';
 export function attivaTastoIndietro() {
   if (!nativa || !P.App) return;
   P.App.addListener('backButton', () => {
+    // prima la plancia (chiude il foglio, torna a Oggi, esce dal 3D); se non serve, come prima
+    if (!document.dispatchEvent(new CustomEvent('matrix-indietro', { cancelable: true }))) return;
     const aperto = ['#oracolo', '#cassetto'].some(s => { const el = document.querySelector(s); return el && !el.hidden; })
       || !document.querySelector('#indietro')?.hidden;
     if (aperto) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

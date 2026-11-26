@@ -571,6 +571,7 @@ function calcolaPunti(){
 
 function giro(now){
   requestAnimationFrame(giro);
+  if (window.MATRIX_PAUSA) return; // nell'app: 3D nascosto dietro la plancia, non si disegna
   const dt = Math.min(.05, (now - E.ultimo) / 1000); E.ultimo = now; const t = (now - E.t0) / 1000;
   if (E.auto && !E.trascina && !riduci) E.meta.az += dt * .035;
   const k = 1 - Math.exp(-dt * 3.1), c = E.cur, m = E.meta;

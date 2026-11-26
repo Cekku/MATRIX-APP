@@ -5,18 +5,21 @@
 
 const SPAZIO = 'modelli', MODELLO = 'stalla.glb', COPIA = 'copia-modelli';
 
-// Campi e numeri della stalla in una sola richiesta. Restano solo in memoria: niente sul dispositivo.
+// Tutti i riassunti in una sola richiesta (pochi KB). Restano solo in memoria: niente sul dispositivo.
+// window.MATRIX_DATI['mondo/tipo/id'] = {dati, aggiornato}; per il 3D anche CAMPI_VERI e STALLA_VERA.
 export async function caricaDati(db) {
   try {
-    const { data, error } = await db.from('voci').select('mondo,tipo,id,dati')
-      .or('and(mondo.eq.campi,tipo.eq.campi,id.eq.tutti),and(mondo.eq.azienda,tipo.eq.riepilogo,id.eq.stalla)');
-    if (error || !data) return;
-    const voce = (m, t) => (data.find(v => v.mondo === m && v.tipo === t) || {}).dati;
-    const campi = (voce('campi', 'campi') || {}).campi;
+    const { data, error } = await db.from('voci').select('mondo,tipo,id,dati,aggiornato');
+    if (error || !data) return false;
+    const tutti = {};
+    data.forEach(v => { tutti[v.mondo + '/' + v.tipo + '/' + v.id] = { dati: v.dati, aggiornato: v.aggiornato }; });
+    window.MATRIX_DATI = tutti;
+    const campi = ((tutti['campi/campi/tutti'] || {}).dati || {}).campi;
     if (Array.isArray(campi) && campi.length) window.CAMPI_VERI = campi;
-    const stalla = voce('azienda', 'riepilogo');
+    const stalla = (tutti['azienda/riepilogo/stalla'] || {}).dati;
     if (stalla && stalla.latte && stalla.capi) window.STALLA_VERA = stalla;
-  } catch (_) { /* senza rete: dati finti */ }
+    return true;
+  } catch (_) { return false; /* senza rete: si vede quello che c'era */ }
 }
 
 // Promessa dell'indirizzo del modello: il Costrutto la aspetta solo quando apre il mondo Azienda.

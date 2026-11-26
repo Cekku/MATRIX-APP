@@ -9,6 +9,7 @@
 <meta name="description" content="Interfaccia personale. Serve l'accesso.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-64.png" sizes="64x64">
+<link rel="stylesheet" href="css/plancia.css">
 <link rel="icon" href="icons/icona.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -306,6 +307,7 @@ body:not(.chiuso) #accesso{display:none}
     <div class="errore" id="errore2" role="alert"></div>
   </form>
 </section>
+<div id="costrutto">
 <canvas id="fondo-pioggia"></canvas>
 <canvas id="scena3d" aria-label="Scena 3D del mondo: trascina per girare, tocca un oggetto"></canvas>
 <div id="etich"></div>
@@ -349,6 +351,7 @@ body:not(.chiuso) #accesso{display:none}
 </div>
 <div id="no3d" class="vetro" hidden>Il 3D non si è caricato (il dispositivo non lo supporta). I pannelli funzionano lo stesso.</div>
 
+</div>
 <script src="vendor/supabase/supabase.js"></script>
 <script type="module" src="js/accesso.js"></script>
 </body>
