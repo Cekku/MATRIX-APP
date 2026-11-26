@@ -1,8 +1,8 @@
 // Service worker della Matrix: prima la rete (così le versioni nuove arrivano subito), copia locale se manca la rete.
 // Quando cambia qualcosa nell'app si alza VERSIONE: i telefoni prendono la nuova da soli.
-const VERSIONE = 'matrix-0.2.1';
+const VERSIONE = 'matrix-0.3.0';
 const GUSCIO = [
-  './', './index.html', './manifest.webmanifest', './js/accesso.js', './js/config.js', './js/costrutto.js', './js/versione.js', './js/nativo.js',
+  './', './index.html', './manifest.webmanifest', './js/accesso.js', './js/config.js', './js/costrutto.js', './js/versione.js', './js/nativo.js', './js/dati.js',
   './vendor/supabase/supabase.js', './vendor/three/three.min.js', './vendor/three/GLTFLoader.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-64.png', './icons/icona.svg',
 ];

@@ -165,7 +165,7 @@ const CAMPI_FINTI = (() => {
 const FONTI = {
   // campi veri: mai nel file pubblicato
   campi: window.CAMPI_VERI || null,  // righe dei campi del gestionale [{id, nome, coltura, ettari, stato, geom}] oppure una FeatureCollection
-  modelloAzienda: null,  // dopo: indirizzo di un file .glb con il progetto 3D dell'azienda (sostituisce il modello disegnato)
+  modelloAzienda: window.MODELLO_AZIENDA || null,  // indirizzo (o promessa di indirizzo) di un .glb con il progetto 3D: sostituisce il modello disegnato
 };
 // nomi delle parti nel GLB → oggetto toccabile (basta che il nome della parte contenga la parola)
 const NOMI_GLB = [['stalla',/stalla|barn|cow/i],['silos',/silo/i],['fv',/fotovolt|pannell|solar|pv/i],
@@ -787,7 +787,8 @@ const MODELLI = {
   costrutto(k){ grafo3D(k, GRAFO_VITA); },
   scuola(k){ grafo3D(k, GRAFO_SCUOLA); },
   async azienda(k){
-    if (FONTI.modelloAzienda){ try { await caricaGLB(FONTI.modelloAzienda, k); return; }
+    if (FONTI.modelloAzienda){ try { await caricaGLB(await FONTI.modelloAzienda, k);
+        NOTA_MONDO.azienda = 'progetto 3D vero della stalla · numeri ancora finti'; try { striscia(); } catch (_) {} return; }
       catch (err) { console.warn('Modello GLB non caricato, uso quello disegnato:', err.message || err); } }
     aziendaDisegnata(k);
   },

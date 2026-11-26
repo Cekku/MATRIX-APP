@@ -2,6 +2,7 @@
 import { SUPABASE_URL, SUPABASE_CHIAVE_PUBBLICA, INDIRIZZO_APP } from './config.js';
 import { VERSIONE } from './versione.js';
 import { nativa, attivaTastoIndietro, controllaAggiornamento } from './nativo.js';
+import { caricaCampi, preparaModello, dimenticaDati } from './dati.js';
 
 const $ = s => document.querySelector(s);
 // arrivo dal collegamento della mail "nuova password": lo leggo prima che Supabase pulisca l'indirizzo
@@ -31,7 +32,11 @@ async function apri(utente) {
   if (aperto) return; aperto = true;
   window.MATRIX_NOME = nomeDa(utente);
   document.body.classList.remove('chiuso');
-  try { await script('vendor/three/three.min.js'); } catch (_) { /* il Costrutto mostra "3D non caricato" */ }
+  preparaModello(db);
+  await Promise.all([
+    script('vendor/three/three.min.js').catch(() => { /* il Costrutto mostra "3D non caricato" */ }),
+    caricaCampi(db),
+  ]);
   await script('js/costrutto.js');
   attivaTastoIndietro();
 }
@@ -88,20 +93,22 @@ $('#nuova-pw').addEventListener('submit', async e => {
 // "Esci": chiude la sessione e ricarica la pagina (così del Costrutto non resta niente in memoria)
 document.addEventListener('click', async e => {
   if (!e.target.closest('#esci')) return;
+  await dimenticaDati();
   await db.auth.signOut();
   location.reload();
 });
 
 db.auth.onAuthStateChange(evento => {
-  if (evento === 'SIGNED_OUT' && aperto) location.reload();
+  if (evento === 'SIGNED_OUT' && aperto) dimenticaDati().finally(() => location.reload());
   if (evento === 'PASSWORD_RECOVERY' && !aperto) mostraNuovaPassword();
 });
 db.auth.getSession().then(({ data }) => {
   if (recupero && data.session) return mostraNuovaPassword();
   if (erroreMail) { history.replaceState(null, '', location.pathname);
     return mostraModulo(erroreMail === 'otp_expired' ? 'Il collegamento della mail è scaduto o già usato: chiedine uno nuovo.' : 'Il collegamento della mail non funziona: chiedine uno nuovo.'); }
-  data.session ? apri(data.session.user) : mostraModulo();
-}).catch(() => mostraModulo());
+  if (data.session) return apri(data.session.user);
+  dimenticaDati(); mostraModulo(); // senza login sul dispositivo non resta niente
+}).catch(() => { dimenticaDati(); mostraModulo(); });
 
 // app installabile: il service worker tiene una copia per aprirsi senza rete e prende da solo le versioni nuove
 // (non nell'APK: lì i file sono già nel telefono e gli aggiornamenti arrivano come APK nuovo)
