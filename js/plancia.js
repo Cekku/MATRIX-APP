@@ -31,6 +31,7 @@ const I = {
   ingranaggio: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   freccia: '<path d="M9 6l6 6-6 6"/>',
+  cerca: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
 const CIELO = c => c == null ? '·' : c === 0 ? '☀' : c <= 2 ? '⛅' : c === 3 ? '☁' : c <= 48 ? '🌫' : c <= 67 || (c >= 80 && c <= 82) ? '🌧' : c <= 77 || c === 85 || c === 86 ? '❄' : '⛈';
@@ -49,9 +50,12 @@ const D = k => (window.MATRIX_DATI || {})[k] || null;      // {dati, aggiornato}
 const dati = k => (D(k) || {}).dati || null;
 
 /* ------------------------------------------------------------------ avvisi: tutto quello da guardare, in ordine */
+const ultimoInvio = () => Object.values(window.MATRIX_DATI || {}).map(v => v.aggiornato).filter(Boolean).sort().pop() || null;
 function avvisi() {
   const out = [], st = dati('azienda/riepilogo/stalla'), mg = dati('azienda/riepilogo/magazzino'), lv = dati('campi/riepilogo/lavori'),
     au = dati('azienda/riepilogo/automazioni'), car = dati('vita/riepilogo/auto'), me = dati('costrutto/riepilogo/meteo');
+  const inv = ultimoInvio(), gi = inv ? (Date.now() - Date.parse(inv)) / 864e5 : null;
+  if (gi != null && gi > 1.5) out.push({ lv: 'at', t: 'Dati fermi da ' + Math.floor(gi) + ' giorni', s: 'il PC non manda i riassunti dal ' + quando(inv) + ': va acceso, o lanciato manda_matrix.py' });
   if (st && st.latte && st.latte.ultimo_giorno) { const g = giorniDa(st.latte.ultimo_giorno);
     if (g > 2) out.push({ lv: 'at', t: 'Latte da registrare', s: 'l’ultimo giorno inserito è il ' + gma(st.latte.ultimo_giorno) + ' (' + g + ' giorni fa)', vai: 'stalla' }); }
   if (car && Array.isArray(car.scadenze)) car.scadenze.forEach(s => { const g = s.data ? -giorniDa(s.data) : null;
@@ -127,6 +131,8 @@ function pagOggi() {
   if (no && no.articoli && no.articoli.length) h += carta('Notizie del ' + esc(gm(no.giorno)), no.articoli.slice(0, 3).map(notizia).join('') +
     `<button type="button" class="pl-btn" data-vai="notizie" style="margin-top:8px">Tutte le notizie ${ic('freccia')}</button>`, 'costrutto/riepilogo/notizie');
   h += `<button type="button" class="pl-btn" data-azione="3d" style="justify-self:start">${ic('cubo')} Apri il Costrutto 3D</button>`;
+  const inv = ultimoInvio();
+  h += `<p class="pl-nota">${inv ? 'Dati mandati dal PC: ' + esc(quando(inv)) + '.' : 'Ancora nessun dato dal PC.'} Tocca ${ic('giri').replace('<svg', '<svg style="width:14px;height:14px;vertical-align:-2px"')} in alto per rileggerli.</p>`;
   return h;
 }
 
@@ -323,6 +329,24 @@ function apriCampo(id) {
   disegna(); const m = $('.pl-mappa'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+/* ricerca unica: campi, prodotti, prezzi, notizie, sezioni */
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function esiti(q) {
+  q = norm(q).trim(); if (q.length < 2) return '<p class="pl-vuoto">Scrivi almeno due lettere: campi, prodotti, prezzi, notizie.</p>';
+  const out = [], mg = dati('azienda/riepilogo/magazzino'), me = dati('azienda/riepilogo/mercati'), no = dati('costrutto/riepilogo/notizie');
+  SCHEDE.concat([['automazioni', 'Automazioni']]).filter(s => norm(s[1]).includes(q)).forEach(s => out.push(`<button type="button" class="pl-riga" data-vai="${s[0]}">${ic(s[0] === 'automazioni' ? 'ingranaggio' : s[0])}<span class="t"><b>${esc(s[1])}</b><span>sezione</span></span>${ic('freccia')}</button>`));
+  (window.CAMPI_VERI || []).filter(c => norm(c.nome).includes(q) || norm(c.coltura).includes(q)).slice(0, 12).forEach(c => out.push(`<button type="button" class="pl-riga" data-campo="${esc(c.id)}"><i class="pl-punto" style="background:${famiglia(c.coltura)[2]}"></i><span class="t"><b>${esc(c.nome)}</b><span>campo · ${esc(c.coltura || 'coltura non indicata')} · ${nf(c.ettari, 2)} ha</span></span>${ic('freccia')}</button>`));
+  ((mg && mg.prodotti) || []).filter(p => norm(p.nome).includes(q) || norm(p.cat).includes(q)).slice(0, 12).forEach(p => out.push(`<button type="button" class="pl-riga" data-prodotto="${esc(p.nome)}"><i class="pl-punto ${p.g < 0 ? 'bad' : ''}"></i><span class="t"><b>${esc(p.nome)}</b><span>magazzino · ${esc(p.cat)}</span></span><span class="v">${nf(p.g, p.g % 1 ? 1 : 0)} ${esc(p.u)}</span></button>`));
+  ((me && me.prezzi) || []).filter(p => norm(p.nome).includes(q)).forEach(p => out.push(`<button type="button" class="pl-riga" data-vai="mercati"><span class="t"><b>${esc(p.nome)}</b><span>prezzo · ${esc(p.u)}</span></span><span class="v">${p.ultimo ? nf(p.ultimo[1], p.ultimo[1] < 10 ? 3 : 2) : '—'}</span></button>`));
+  ((no && no.articoli) || []).filter(a => norm(a.titolo).includes(q) || norm(a.testo).includes(q)).slice(0, 6).forEach(a => out.push(notizia(a)));
+  return out.length ? `<div class="pl-elenco">${out.join('')}</div>` : '<p class="pl-vuoto">Niente trovato.</p>';
+}
+function apriCerca() {
+  apriFoglio(`<button type="button" class="pl-btn pl-chiudi" data-chiudi aria-label="Chiudi">${ic('x')}</button><h3>Cerca</h3><p class="pl-sotto">In campi, magazzino, prezzi e notizie</p>
+    <input class="pl-cerca" id="cerca-tutto" type="search" placeholder="Es. mais, gasolio, latte…" autocomplete="off"><div id="esiti" style="margin-top:8px">${esiti('')}</div>`);
+  setTimeout(() => { const i = $('#cerca-tutto'); if (i) i.focus(); }, 30);
+}
+
 /* mappa: zoom e spostamento con dita, rotella e pulsanti */
 function centra(p) {
   const [x0, y0, x1, y1] = p.box, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, w = Math.max(MAPPA.base[2] / 8, (x1 - x0) * 3, (y1 - y0) * 3);
@@ -355,6 +379,7 @@ export function avviaPlancia(o) {
   opz = o; // {apri3d(), aggiorna()}
   const p = document.createElement('main'); p.id = 'plancia';
   p.innerHTML = `<div class="pl-testa" role="banner"><h1 id="pl-titolo"></h1>
+      <button type="button" class="pl-btn" data-azione="cerca" title="Cerca" aria-label="Cerca in tutta la Matrix">${ic('cerca')}</button>
       <button type="button" class="pl-btn" data-azione="aggiorna" title="Aggiorna i dati" aria-label="Aggiorna i dati">${ic('giri')}</button>
       <button type="button" class="pl-btn" data-azione="3d" title="Costrutto 3D">${ic('cubo')}<span>3D</span></button></div>
     <nav class="pl-nav" id="pl-nav" aria-label="Sezioni"></nav><div class="pl-corpo" id="pl-corpo"></div>`;
@@ -366,16 +391,19 @@ export function avviaPlancia(o) {
     const a = e.target.closest('[data-azione]'), v = e.target.closest('[data-vai]'), c = e.target.closest('[data-cat]'), z = e.target.closest('[data-zoom]'), cm = e.target.closest('[data-campo]');
     if (a) { e.preventDefault(); chiudiFoglio();
       if (a.dataset.azione === '3d') opz.apri3d();
+      if (a.dataset.azione === 'cerca') apriCerca();
       if (a.dataset.azione === 'aggiorna') { a.disabled = true; try { await opz.aggiorna(); MAPPA = null; disegna(); } finally { a.disabled = false; } }
       return; }
     if (v) return vai(v.dataset.vai);
     if (c) { stato.catMag = c.dataset.cat; return disegna(); }
-    if (cm) return apriCampo(cm.dataset.campo);
+    if (cm) { chiudiFoglio(); return vai('campi'), apriCampo(cm.dataset.campo); }
+    const pr = e.target.closest('[data-prodotto]'); if (pr) { stato.filtroMag = pr.dataset.prodotto; stato.catMag = ''; return vai('magazzino'); }
     if (z && MAPPA) { const f = +z.dataset.zoom; const svg = $('#mappa-svg');
       if (!f) { MAPPA.vb = MAPPA.base.slice(); stato.campoSel = null; return disegna(); }
       const [x, y, w, h] = MAPPA.vb; MAPPA.vb = [x + (w - w * f) / 2, y + (h - h * f) / 2, w * f, h * f]; if (svg) svg.setAttribute('viewBox', MAPPA.vb.join(' ')); }
   });
   p.addEventListener('input', e => {
+    if (e.target.id === 'cerca-tutto') { $('#esiti').innerHTML = esiti(e.target.value); return; }
     if (e.target.id === 'cerca-mag') { stato.filtroMag = e.target.value; ridisegnaTenendoFuoco('cerca-mag'); }
     if (e.target.id === 'cerca-campo') { stato.cercaCampo = e.target.value; stato.campoSel = null; ridisegnaTenendoFuoco('cerca-campo'); }
   });
