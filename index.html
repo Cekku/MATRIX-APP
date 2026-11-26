@@ -116,6 +116,11 @@ div.e3d{pointer-events:none;cursor:default}
 .guida{position:fixed;z-index:3;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(var(--sotto) + 4px);
   font-size:13px;color:var(--mut);pointer-events:none;transition:opacity .6s;text-shadow:0 1px 8px #000}
 .guida.via{opacity:0}
+#striscia .stit{cursor:pointer}
+#striscia .stit::after{content:'▾';margin-left:auto;padding-left:10px;color:var(--fioco)}
+#striscia.chiusa .stit::after{content:'▴'}
+#striscia.chiusa .indic{display:none}
+#striscia.chiusa .stit{margin-bottom:0}
 #bussola{position:fixed;z-index:4;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(var(--sotto) + 4px);display:flex;align-items:center;gap:12px;padding:8px 12px}
 #bussola .ago{width:40px;height:40px;border-radius:50%;border:1px solid var(--linea-forte);position:relative;flex:none}
 #bussola .ago span{position:absolute;inset:0;display:grid;place-items:start center;font:700 12px var(--mono);color:var(--tx);padding-top:2px}
@@ -252,7 +257,8 @@ button.ramo{cursor:pointer}button.ramo:hover{border-color:var(--linea-forte)}
   #oracolo{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-left:8px;padding-right:8px}
   .palette{max-height:86vh}
   .voce .dove{display:none}
-  .guida{display:none}
+  .guida{left:12px;right:12px;bottom:calc(210px + env(safe-area-inset-bottom,0px));font-size:12px;text-align:center}
+  body.striscia-chiusa .guida{bottom:calc(120px + env(safe-area-inset-bottom,0px))}
   .e3d{padding:3px 7px 4px}.e3d b{font-size:12px}.e3d small{font-size:12px}
   .e3d.mondo b{font-size:13px}
 }

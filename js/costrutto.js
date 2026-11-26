@@ -466,7 +466,14 @@ function luceDelGiorno(){
 function controlli(cv){
   // un dito / mouse: ruota · due dita: ingrandisci e sposta · tasto destro o Maiusc + trascina: sposta · rotella: ingrandisci
   let giu = false, px = 0, py = 0, mosso = 0, ultimoHover = 0, sposta = false;
-  const dita = new Map(); let pinza = null;
+  const dita = new Map(); let pinza = null, ultimoTocco = null;
+  // doppio tocco (o doppio clic): si avvicina al punto toccato
+  function avvicina(x, y){
+    if (!E.G) return; E.ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); E.ray.setFromCamera(E.ndc, E.cam);
+    const h = E.ray.intersectObjects(E.G.children, true)[0], p = h ? h.point.clone() : E.ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+    if (!p) return; const r = Math.hypot(p.x, p.z); if (r > 80){ p.x *= 80 / r; p.z *= 80 / r; }
+    E.meta.t.copy(p); zoom(.5); nascondiGuida(); }
+  cv.addEventListener('dblclick', e => { e.preventDefault(); avvicina(e.clientX, e.clientY); });
   const minDist = () => nordFisso(mondo) ? 3 : 3.5, maxDist = 190;
   const zoom = f => { E.meta.dist = limita(E.meta.dist * f, minDist(), maxDist); E.auto = false; $('#indietro').hidden = false; };
   function trasla(dx, dy){ // muove il punto guardato come una mappa sotto il dito
@@ -495,7 +502,11 @@ function controlli(cv){
     if (pinza){ if (dita.size < 2) pinza = null;
       if (dita.size === 1){ const [d] = [...dita.values()]; px = d.x; py = d.y; giu = true; sposta = false; } // resta un dito: riprende a ruotare senza salti
       else { giu = false; E.trascina = false; } return; }
-    if (!giu) return; giu = false; E.trascina = false; if (mosso < 6 && e.type === 'pointerup') tocca(e.clientX, e.clientY); };
+    if (!giu) return; giu = false; E.trascina = false;
+    if (mosso < 6 && e.type === 'pointerup'){
+      const ora = e.timeStamp, doppio = ultimoTocco && ora - ultimoTocco.t < 330 && Math.hypot(e.clientX - ultimoTocco.x, e.clientY - ultimoTocco.y) < 40;
+      ultimoTocco = doppio ? null : {t:ora, x:e.clientX, y:e.clientY};
+      if (doppio) avvicina(e.clientX, e.clientY); else tocca(e.clientX, e.clientY); } };
   cv.addEventListener('pointerup', su); cv.addEventListener('pointercancel', su);
   cv.addEventListener('wheel', e => { e.preventDefault(); zoom(1 + Math.sign(e.deltaY) * .12); nascondiGuida(); }, {passive:false});
 }
@@ -572,6 +583,7 @@ function calcolaPunti(){
 function giro(now){
   requestAnimationFrame(giro);
   if (window.MATRIX_PAUSA) return; // nell'app: 3D nascosto dietro la plancia, non si disegna
+  if (E.leggero && now - E.ultimo < 30) return; // telefono: circa 30 fotogrammi al secondo, scalda e consuma meno
   const dt = Math.min(.05, (now - E.ultimo) / 1000); E.ultimo = now; const t = (now - E.t0) / 1000;
   if (E.auto && !E.trascina && !riduci) E.meta.az += dt * .035;
   const k = 1 - Math.exp(-dt * 3.1), c = E.cur, m = E.meta;
@@ -955,7 +967,7 @@ function pioggiaFondo(on){
   cv.classList.toggle('on', on);
 }
 function cadeFondo(now){
-  if (!PF.on) return; PF.raf = requestAnimationFrame(cadeFondo); if (now - PF.ult < 80) return; PF.ult = now;
+  if (!PF.on) return; PF.raf = requestAnimationFrame(cadeFondo); if (window.MATRIX_PAUSA || now - PF.ult < 80) return; PF.ult = now;
   const c = PF.ctx, cv = PF.cv;
   if (cv.width !== innerWidth || cv.height !== innerHeight){ cv.width = innerWidth; cv.height = innerHeight; }
   c.globalCompositeOperation = 'destination-out'; c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(0, 0, cv.width, cv.height);
@@ -964,7 +976,7 @@ function cadeFondo(now){
   PF.gocce.forEach((y, i) => { c.fillText(CAR[Math.random() * CAR.length | 0], i * 20, y * 20); PF.gocce[i] = (y * 20 > cv.height && Math.random() > .95) ? 0 : y + 1; });
 }
 function cade(now){
-  if (!PG.on) return; PG.raf = requestAnimationFrame(cade); if (now - PG.ult < 40) return; PG.ult = now;
+  if (!PG.on) return; PG.raf = requestAnimationFrame(cade); if (window.MATRIX_PAUSA || now - PG.ult < 40) return; PG.ult = now;
   const c = PG.ctx, cv = PG.cv;
   c.globalCompositeOperation = 'destination-out'; c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(0, 0, cv.width, cv.height);
   c.globalCompositeOperation = 'source-over';
@@ -976,6 +988,12 @@ function cade(now){
 // TASTI E TOCCHI
 // =====================================================================
 function nascondiGuida(){ $('#guida').classList.add('via'); }
+if (matchMedia('(pointer:coarse)').matches) $('#guida').textContent = 'Un dito gira · due dita ingrandiscono e spostano · doppio tocco avvicina · tocca un oggetto';
+else $('#guida').textContent += ' · doppio clic per avvicinarti';
+// la striscia in basso si chiude e si riapre toccando il titolo (resta come l'hai lasciata)
+try { if (localStorage.getItem('matrix-striscia') === 'chiusa'){ $('#striscia').classList.add('chiusa'); document.body.classList.add('striscia-chiusa'); } } catch (_) {}
+$('#striscia').addEventListener('click', e => { if (!e.target.closest('.stit') || e.target.closest('button')) return;
+  const c = $('#striscia').classList.toggle('chiusa'); document.body.classList.toggle('striscia-chiusa', c); try { localStorage.setItem('matrix-striscia', c ? 'chiusa' : 'aperta'); } catch (_) {} });
 setTimeout(nascondiGuida, 9000);
 document.addEventListener('click', e => {
   const t = e.target;
