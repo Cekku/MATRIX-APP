@@ -31,6 +31,7 @@ const I = {
   ingranaggio: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   freccia: '<path d="M9 6l6 6-6 6"/>',
+  sole: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
   cerca: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
@@ -44,7 +45,7 @@ const famiglia = col => FAM.find(f => f[1].test(String(col || ''))) || FAM[FAM.l
 const SCHEDE = [['oggi', 'Oggi'], ['stalla', 'Stalla'], ['campi', 'Campi'], ['magazzino', 'Magazzino'], ['mercati', 'Mercati'], ['auto', 'Auto'], ['notizie', 'Notizie']];
 const IN_BASSO = ['oggi', 'stalla', 'campi', 'magazzino'];
 
-const stato = { scheda: 'oggi', filtroMag: '', catMag: '', cercaCampo: '', campoSel: null };
+const stato = { scheda: 'oggi', filtroMag: '', catMag: '', ordMag: 'nome', cercaCampo: '', campoSel: null };
 let opz = {};
 const D = k => (window.MATRIX_DATI || {})[k] || null;      // {dati, aggiornato}
 const dati = k => (D(k) || {}).dati || null;
@@ -71,28 +72,47 @@ function avvisi() {
 }
 
 /* ------------------------------------------------------------------ grafici in SVG */
-function lineaSvg(punti, { alto = 190, largo = 640, etichette = [], unita = '' } = {}) {
+// grafici a linea da toccare: scorrendo col dito (o col mouse) si legge il valore di ogni punto
+let GRAF = [];
+function lineaSvg(punti, { alto = 190, largo = 640, etichette = [], unita = '', data = d => gm(d), dec = 0 } = {}) {
   const v = punti.map(p => p[1]).filter(x => typeof x === 'number');
   if (v.length < 2) return '<p class="pl-vuoto">Pochi dati per il grafico.</p>';
   const min = Math.min(...v), max = Math.max(...v), m = 8, s = 30, sx = (largo - s - m) / (punti.length - 1);
   const y = x => m + 24 + (alto - 2 * m - 54) * (1 - (max === min ? .5 : (x - min) / (max - min)));
-  const pts = punti.map((p, i) => [s + i * sx, typeof p[1] === 'number' ? y(p[1]) : null]).filter(p => p[1] != null);
-  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  const area = d + ` L${pts[pts.length - 1][0].toFixed(1)} ${alto - 26} L${pts[0][0].toFixed(1)} ${alto - 26} Z`;
-  const ult = pts[pts.length - 1];
-  return `<svg class="pl-grafico" viewBox="0 0 ${largo} ${alto}" role="img" aria-label="grafico">
-    <path d="${area}" fill="rgba(127,216,164,.12)"/><path d="${d}" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linejoin="round"/>
-    <circle cx="${ult[0]}" cy="${ult[1]}" r="4" fill="var(--ok)"/>
-    <text x="${largo - m}" y="${m + 16}" text-anchor="end">max ${nf(max)}${unita}</text>
-    <text x="${s}" y="${m + 16}">min ${nf(min)}${unita}</text>
-    ${etichette.map(([i, t]) => `<text x="${Math.min(largo - 30, Math.max(30, s + i * sx))}" y="${alto - 4}" text-anchor="middle">${esc(t)}</text>`).join('')}</svg>`;
+  const pts = punti.map((p, i) => typeof p[1] === 'number' ? { x: s + i * sx, y: y(p[1]), t: data(p[0]) + ': ' + nf(p[1], dec) + unita } : null).filter(Boolean);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+  const area = d + ` L${pts[pts.length - 1].x.toFixed(1)} ${alto - 26} L${pts[0].x.toFixed(1)} ${alto - 26} Z`;
+  const ult = pts[pts.length - 1], id = GRAF.push({ pts, largo, alto }) - 1;
+  return `<svg class="pl-grafico pl-tocca" data-g="${id}" viewBox="0 0 ${largo} ${alto}" role="img" aria-label="grafico: scorri per leggere i valori">
+    <path d="${area}" fill="var(--pl-area)"/><path d="${d}" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linejoin="round"/>
+    <circle cx="${ult.x}" cy="${ult.y}" r="4" fill="var(--ok)"/>
+    <text x="${largo - m}" y="${m + 16}" text-anchor="end" class="g-max">max ${nf(max, dec)}${unita}</text>
+    <text x="${s}" y="${m + 16}" class="g-min">min ${nf(min, dec)}${unita}</text>
+    ${etichette.map(([i, t]) => `<text x="${Math.min(largo - 30, Math.max(30, s + i * sx))}" y="${alto - 4}" text-anchor="middle">${esc(t)}</text>`).join('')}
+    <g class="g-cur" style="display:none"><line y1="${m + 22}" y2="${alto - 26}" stroke="var(--mut)" stroke-dasharray="4 4"/><circle r="6" fill="var(--ok)" stroke="var(--pl-carta)" stroke-width="2"/>
+      <rect rx="8" height="30" fill="var(--pl-foglio)" stroke="var(--linea-forte)"/><text class="g-val" style="fill:var(--tx)"></text></g></svg>`;
+}
+function collegaGrafici() {
+  document.querySelectorAll('#pl-corpo .pl-tocca, #pl-velo .pl-tocca').forEach(svg => {
+    const G = GRAF[+svg.dataset.g]; if (!G || svg.dataset.ok) return; svg.dataset.ok = 1;
+    const cur = svg.querySelector('.g-cur'), [ln, ci, rc, tx] = [cur.querySelector('line'), cur.querySelector('circle'), cur.querySelector('rect'), cur.querySelector('.g-val')];
+    const mostra = e => { const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * G.largo;
+      const p = G.pts.reduce((a, b) => Math.abs(b.x - x) < Math.abs(a.x - x) ? b : a);
+      cur.style.display = ''; svg.querySelectorAll('.g-max,.g-min').forEach(t => t.style.display = 'none');
+      ln.setAttribute('x1', p.x); ln.setAttribute('x2', p.x); ci.setAttribute('cx', p.x); ci.setAttribute('cy', p.y);
+      tx.textContent = p.t; const w = p.t.length * 10.5 + 20, bx = Math.min(G.largo - w - 2, Math.max(2, p.x - w / 2));
+      rc.setAttribute('x', bx); rc.setAttribute('y', 2); rc.setAttribute('width', w); tx.setAttribute('x', bx + 10); tx.setAttribute('y', 24); };
+    const nascondi = () => { cur.style.display = 'none'; svg.querySelectorAll('.g-max,.g-min').forEach(t => t.style.display = ''); };
+    svg.addEventListener('pointerdown', mostra); svg.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) mostra(e); });
+    svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') nascondi(); });
+  });
 }
 function barreSvg(punti, { alto = 180, largo = 640 } = {}) {
   const v = punti.map(p => p[1] || 0); if (!v.length) return '';
   const max = Math.max(...v) || 1, min = Math.min(...v) * .9, w = largo / punti.length;
   return `<svg class="pl-grafico" viewBox="0 0 ${largo} ${alto}" role="img" aria-label="grafico a barre">
     ${punti.map((p, i) => { const h = (alto - 40) * ((p[1] - min) / (max - min || 1)) + 6, x = i * w + 4;
-      return `<rect x="${x}" y="${alto - 28 - h}" width="${w - 8}" height="${h}" rx="4" fill="${i === punti.length - 1 ? 'var(--ok)' : 'rgba(255,255,255,.18)'}"><title>${esc(MESI[+p[0].slice(5, 7) - 1] + ' ' + p[0].slice(0, 4))}: ${nf(p[1])} L</title></rect>
+      return `<rect x="${x}" y="${alto - 28 - h}" width="${w - 8}" height="${h}" rx="4" fill="${i === punti.length - 1 ? 'var(--ok)' : 'var(--pl-barra)'}"><title>${esc(MESI[+p[0].slice(5, 7) - 1] + ' ' + p[0].slice(0, 4))}: ${nf(p[1])} L</title></rect>
       <text x="${x + (w - 8) / 2}" y="${alto - 4}" text-anchor="middle">${esc(MESI[+p[0].slice(5, 7) - 1] || '')}</text>`; }).join('')}</svg>`;
 }
 function spark(valori, largo = 110, alto = 32) {
@@ -108,6 +128,7 @@ const LV = { bad: 1, at: 1, info: 1 }, lvOk = x => LV[x] ? x : '';
 const riga = (a, conVai = true) => { const b = a.vai && conVai && /^[a-z]+$/.test(a.vai);
   return `<${b ? `button type="button" data-vai="${a.vai}"` : 'div'} class="pl-riga">${a.lv != null ? `<i class="pl-punto ${lvOk(a.lv)}"></i>` : ''}
   <span class="t"><b>${esc(a.t)}</b>${a.s ? `<span>${esc(a.s)}</span>` : ''}</span>${a.v != null ? `<span class="v">${a.v}</span>` : ''}${b ? ic('freccia') : ''}</${b ? 'button' : 'div'}>`; };
+// attenzione: `val` di kpi() e `v` di riga() entrano così come sono: solo numeri da nf() o testo già passato da esc()
 const kpi = (val, etichetta, vai, lv = '') => `<${vai ? `button type="button" data-vai="${vai}"` : 'div'} class="pl-k ${lvOk(lv)}"><b>${val}</b><span>${esc(etichetta)}</span></${vai ? 'button' : 'div'}>`;
 const nienteDati = cosa => `<p class="pl-vuoto">Nessun dato ${esc(cosa)}: arrivano quando il PC manda i riassunti.</p>`;
 
@@ -220,11 +241,13 @@ function pagCampi() {
 function pagMagazzino() {
   const mg = dati('azienda/riepilogo/magazzino'); if (!mg) return carta('Magazzino', nienteDati('del magazzino'));
   const cats = Object.keys(mg.per_categoria || {}).sort(), q = stato.filtroMag.toLowerCase();
-  const righe = (mg.prodotti || []).filter(p => (!stato.catMag || p.cat === stato.catMag) && (!q || p.nome.toLowerCase().includes(q)));
+  const ORD = { nome: (a, b) => a.cat.localeCompare(b.cat) || a.nome.localeCompare(b.nome), piu: (a, b) => b.g - a.g, meno: (a, b) => a.g - b.g, recenti: (a, b) => String(b.ultimo || '').localeCompare(String(a.ultimo || '')) };
+  const righe = (mg.prodotti || []).filter(p => (!stato.catMag || p.cat === stato.catMag) && (!q || p.nome.toLowerCase().includes(q))).sort(ORD[stato.ordMag] || ORD.nome);
   let h = '';
   if (mg.avvisi && mg.avvisi.length) h += carta('Da guardare · ' + mg.avvisi.length, `<div class="pl-elenco">${mg.avvisi.map(a => riga({ lv: a.lv, t: a.t, s: a.s }, false)).join('')}</div>`, 'azienda/riepilogo/magazzino');
   h += carta('Prodotti', `<input class="pl-cerca" id="cerca-mag" type="search" placeholder="Cerca un prodotto" value="${esc(stato.filtroMag)}" autocomplete="off">
     <div class="pl-chip-riga" style="margin-top:10px"><button type="button" class="pl-chip ${!stato.catMag ? 'on' : ''}" data-cat="">Tutti</button>${cats.map(c => `<button type="button" class="pl-chip ${stato.catMag === c ? 'on' : ''}" data-cat="${esc(c)}">${esc(c)} <small>${nf(mg.per_categoria[c])}</small></button>`).join('')}</div>
+    <div class="pl-chip-riga" style="margin-top:4px"><span style="align-self:center;font-size:12px;color:var(--fioco);flex:none">Ordina:</span>${[['nome', 'per nome'], ['piu', 'più scorte'], ['meno', 'meno scorte'], ['recenti', 'movimenti recenti']].map(([k, t]) => `<button type="button" class="pl-chip ${stato.ordMag === k ? 'on' : ''}" data-ord="${k}">${t}</button>`).join('')}</div>
     <div class="pl-elenco" style="margin-top:6px">${righe.length ? righe.map(p => riga({ lv: p.g < 0 ? 'bad' : p.g === 0 ? 'info' : '', t: p.nome, s: p.cat + (p.ultimo ? ' · ultimo movimento ' + gma(p.ultimo) : ''),
       v: `<span class="${p.g < 0 ? 'bad-t' : ''}">${nf(p.g, p.g % 1 ? 1 : 0)} ${esc(p.u)}</span>` }, false)).join('') : '<p class="pl-vuoto">Nessun prodotto.</p>'}</div>
     <p class="pl-nota">Giacenze calcolate da carichi, scarichi e inventari del gestionale.</p>`, 'azienda/riepilogo/magazzino');
@@ -240,9 +263,19 @@ function pagMercati() {
   const quandoP = d => !d ? '' : d.length > 7 ? gm(d) : MESI[+d.slice(5, 7) - 1] + ' ' + d.slice(2, 4);
   return `<div class="pl-griglia">` + Object.entries(gr).map(([g, l]) => carta(nomi[g] || esc(g), `<div class="pl-elenco">${l.map(p => {
     const u = p.ultimo ? p.ultimo[1] : null, pr = p.prima ? p.prima[1] : null, d = u != null && pr ? (u - pr) / pr * 100 : null;
-    return `<div class="pl-riga"><span class="t"><b>${esc(p.nome)}</b><span>${esc(p.u)}${p.ultimo ? ' · ' + esc(quandoP(p.ultimo[0])) : ''}</span></span>
-      ${spark((p.mesi || []).map(x => x[1]))}<span class="v">${nf(u, u < 10 ? 3 : u < 100 ? 2 : 0)}${d != null ? `<small class="${Math.abs(d) < .05 ? 'fermo' : d > 0 ? 'su' : 'giu'}">${Math.abs(d) < .05 ? '= uguale' : (d > 0 ? '▲ ' : '▼ ') + nf(Math.abs(d), 1) + '%'}</small>` : ''}</span></div>`; }).join('')}</div>`, 'azienda/riepilogo/mercati')).join('')
+    return `<button type="button" class="pl-riga" data-mercato="${(me.prezzi || []).indexOf(p)}"><span class="t"><b>${esc(p.nome)}</b><span>${esc(p.u)}${p.ultimo ? ' · ' + esc(quandoP(p.ultimo[0])) : ''}</span></span>
+      ${spark((p.mesi || []).map(x => x[1]))}<span class="v">${nf(u, u < 10 ? 3 : u < 100 ? 2 : 0)}${d != null ? `<small class="${Math.abs(d) < .05 ? 'fermo' : d > 0 ? 'su' : 'giu'}">${Math.abs(d) < .05 ? '= uguale' : (d > 0 ? '▲ ' : '▼ ') + nf(Math.abs(d), 1) + '%'}</small>` : ''}</span></button>`; }).join('')}</div>`, 'azienda/riepilogo/mercati')).join('')
     + `</div><p class="pl-nota">Prezzi pubblici raccolti dal gestionale. La linea è l’andamento degli ultimi mesi; la freccia confronta con la rilevazione prima.</p>`;
+}
+
+function apriMercato(i) {
+  const p = ((dati('azienda/riepilogo/mercati') || {}).prezzi || [])[i]; if (!p) return;
+  const dec = (p.ultimo && p.ultimo[1] < 10) ? 3 : 2, mese = d => MESI[+d.slice(5, 7) - 1] + ' ' + d.slice(2, 4);
+  apriFoglio(`<button type="button" class="pl-btn pl-chiudi" data-chiudi aria-label="Chiudi">${ic('x')}</button><h3>${esc(p.nome)}</h3><p class="pl-sotto">${esc(p.u)}${p.fonte ? ' · ' + esc(p.fonte) : ''}</p>
+    <h2 style="font:600 13px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)">Media per mese</h2>
+    ${lineaSvg(p.mesi || [], { data: mese, dec, etichette: (p.mesi || []).map((x, k) => [k, mese(x[0])]).filter((_, k, l) => k % Math.ceil(l.length / 6) === 0) })}
+    <p class="pl-nota">Scorri sul grafico per leggere ogni mese.${p.ultimo ? ' Ultimo valore: ' + esc(nf(p.ultimo[1], dec)) + '.' : ''}</p>`);
+  collegaGrafici();
 }
 
 /* ------------------------------------------------------------------ AUTO (libretto) */
@@ -295,9 +328,10 @@ export function disegna() {
   if (!$('#plancia')) return;
   disegnaTesta(); disegnaNav();
   const corpo = $('#pl-corpo'), alto = stato.scheda === corpo.dataset.scheda ? corpo.scrollTop : 0;
-  corpo.innerHTML = `<div class="pl-pagina">${(PAGINE[stato.scheda] || pagOggi)()}</div>`;
+  GRAF = []; corpo.innerHTML = `<div class="pl-pagina">${(PAGINE[stato.scheda] || pagOggi)()}</div>`;
   corpo.dataset.scheda = stato.scheda; corpo.scrollTop = alto;
   if (stato.scheda === 'campi') collegaMappa();
+  collegaGrafici();
 }
 function vai(scheda) {
   if (scheda === 'piu') return apriMenu();
@@ -320,6 +354,7 @@ function apriMenu() {
     <div class="pl-elenco">${voce('mercati', 'Mercati', 'prezzi di latte, mais, soia, concimi, gasolio')}${voce('auto', 'Auto', 'scadenze e lavori del libretto')}
     ${voce('notizie', 'Notizie', 'la rassegna del giorno')}${voce('automazioni', 'Automazioni', 'cosa fa da solo il gestionale', 'ingranaggio')}
     <button type="button" class="pl-riga" data-azione="3d">${ic('cubo')}<span class="t"><b>Costrutto 3D</b><span>la stalla e i campi in 3D</span></span>${ic('freccia')}</button>
+    <button type="button" class="pl-riga" data-azione="tema">${ic('sole')}<span class="t"><b>Colori: ${NOMI_TEMA[tema()]}</b><span>tocca per cambiare (automatico, chiaro, scuro)</span></span></button>
     <button type="button" class="pl-riga" data-azione="aggiorna">${ic('giri')}<span class="t"><b>Aggiorna i dati</b><span>rilegge i riassunti dal server</span></span></button>
     <button type="button" class="pl-riga" data-esci>${ic('esci')}<span class="t"><b>Esci dalla Matrix</b><span>chiude l’accesso su questo dispositivo</span></span></button></div>`);
 }
@@ -374,9 +409,16 @@ function collegaMappa() {
   svg.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.18 : 1 / 1.18, e.clientX, e.clientY); }, { passive: false });
 }
 
+/* tema: automatico (come il telefono), chiaro, scuro. Solo una preferenza di vista sul dispositivo. */
+const TEMI = ['auto', 'chiaro', 'scuro'], NOMI_TEMA = { auto: 'automatici', chiaro: 'chiari', scuro: 'scuri' };
+const tema = () => { try { const t = localStorage.getItem('matrix-tema'); return TEMI.includes(t) ? t : 'auto'; } catch (_) { return 'auto'; } };
+const chiaroSistema = matchMedia('(prefers-color-scheme: light)');
+function applicaTema() { const t = tema(); document.body.classList.toggle('tema-chiaro', t === 'chiaro' || (t === 'auto' && chiaroSistema.matches)); }
+
 /* ------------------------------------------------------------------ avvio */
 export function avviaPlancia(o) {
   opz = o; // {apri3d(), aggiorna()}
+  applicaTema(); chiaroSistema.addEventListener('change', applicaTema);
   const p = document.createElement('main'); p.id = 'plancia';
   p.innerHTML = `<div class="pl-testa" role="banner"><h1 id="pl-titolo"></h1>
       <button type="button" class="pl-btn" data-azione="cerca" title="Cerca" aria-label="Cerca in tutta la Matrix">${ic('cerca')}</button>
@@ -392,11 +434,14 @@ export function avviaPlancia(o) {
     if (a) { e.preventDefault(); chiudiFoglio();
       if (a.dataset.azione === '3d') opz.apri3d();
       if (a.dataset.azione === 'cerca') apriCerca();
+      if (a.dataset.azione === 'tema') { const t = TEMI[(TEMI.indexOf(tema()) + 1) % TEMI.length]; try { localStorage.setItem('matrix-tema', t); } catch (_) { } applicaTema(); apriMenu(); }
       if (a.dataset.azione === 'aggiorna') { a.disabled = true; try { await opz.aggiorna(); MAPPA = null; disegna(); } finally { a.disabled = false; } }
       return; }
     if (v) return vai(v.dataset.vai);
     if (c) { stato.catMag = c.dataset.cat; return disegna(); }
+    const od = e.target.closest('[data-ord]'); if (od) { stato.ordMag = od.dataset.ord; return disegna(); }
     if (cm) { chiudiFoglio(); return vai('campi'), apriCampo(cm.dataset.campo); }
+    const mc = e.target.closest('[data-mercato]'); if (mc) return apriMercato(+mc.dataset.mercato);
     const pr = e.target.closest('[data-prodotto]'); if (pr) { stato.filtroMag = pr.dataset.prodotto; stato.catMag = ''; return vai('magazzino'); }
     if (z && MAPPA) { const f = +z.dataset.zoom; const svg = $('#mappa-svg');
       if (!f) { MAPPA.vb = MAPPA.base.slice(); stato.campoSel = null; return disegna(); }
