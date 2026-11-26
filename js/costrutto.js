@@ -77,7 +77,7 @@ const RISP = [
   [/latte/i,'Ieri 2.000 litri, 28,6 a capo. In linea con la settimana.','Azienda · sala mungitura (finto)'],
   [/fotovolt|sole|kwh/i,'Oggi 41 kWh, nessun allarme dall\'inverter. Autoconsumo al 78%.','Azienda · fotovoltaico (finto)'],
   [/bot|segnal/i,'Il bot è acceso: 2 segnali stanotte, nessun errore. Li puoi rivedere nel mondo Trading.','Trading · bot Telegram'],
-  [/compr|vend|entr/i,'Su cosa comprare o vendere non do consigli. Posso mostrarti cosa dice il bot, oppure ripassare con Morpheus le tue regole.','Matrix'],
+  [/compr|vend|entr|convien|investi/i,'Su cosa comprare o vendere non do consigli. Posso mostrarti cosa dice il bot, oppure ripassare con Morpheus le tue regole.','Matrix'],
   [/studi|scuola|morpheus/i,'Ci sono 3 materiali da studiare. Dimmi "Morpheus, studia" e li digerisce.','Trading · Scuola']];
 const SUGG = ['Cosa c\'è da fare questa settimana?','Come va il fotovoltaico?','Il bot è acceso?','Cosa compro oggi?'];
 // striscia in basso: [titolo, [[etichetta, valore, percentuale, stato]]]
@@ -233,6 +233,49 @@ if (window.STALLA_VERA){ (function(){
   const r = RISP.find(x => x[0].test('latte')); if (r){ r[1] = 'Il ' + gm(L.ultimo_giorno) + ' ' + litri(L.litri) + (aCapo ? ', ' + numIt(aCapo) + ' a capo' : '') + '. Media degli ultimi 30 giorni ' + litri(L.media30) + '.'; r[2] = 'Gestionale · latte'; }
   const nodo = GRAFO_VITA.nodi.find(x => x[0] === 'stalla'); if (nodo){ nodo[5] = numIt(n('lattazione'), 0) + ' in lattazione'; nodo[6] = n('da_fecondare') ? 'at' : ''; }
 })(); }
+// con i riassunti veri (nell'app, dopo il login): l'Oracolo risponde con quelli invece delle frasi finte
+if (window.MATRIX_DATI){ (function(){
+  const V = k => ((window.MATRIX_DATI[k] || {}).dati) || null, n0 = x => numIt(x || 0, 0);
+  const gm = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '—';
+  const st = V('azienda/riepilogo/stalla'), mg = V('azienda/riepilogo/magazzino'), lv = V('campi/riepilogo/lavori'),
+    me = V('azienda/riepilogo/mercati'), no = V('costrutto/riepilogo/notizie'), auto = V('vita/riepilogo/auto');
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const nuove = [];
+  const generale = [/settimana|da fare|guardar|novit|urgent|com'?è la situazione/i, () => {
+    const c = [];
+    if (st && st.latte && st.latte.ultimo_giorno){ const g = Math.round((Date.now() - new Date(st.latte.ultimo_giorno)) / 864e5); if (g > 2) c.push('il latte è registrato solo fino al ' + gm(st.latte.ultimo_giorno)); }
+    if (st && st.capi && st.capi.da_fecondare) c.push(n0(st.capi.da_fecondare) + ' vacche da fecondare');
+    if (st && st.capi && st.capi.parti_30gg) c.push(n0(st.capi.parti_30gg) + ' parti nei prossimi 30 giorni');
+    if (mg && mg.avvisi && mg.avvisi.length) c.push(mg.avvisi.length + ' prodotti del magazzino da controllare');
+    if (lv && lv.in_ritardo) c.push(lv.in_ritardo + ' lavori in ritardo');
+    if (auto && auto.scadenze) auto.scadenze.filter(s => s.data && (new Date(s.data) - Date.now()) / 864e5 <= 30).forEach(s => c.push(s.titolo.toLowerCase() + ' dell’auto entro il ' + gm(s.data)));
+    return c.length ? 'Da guardare: ' + c.join('; ') + '.' : 'Niente di urgente: è tutto a posto.'; }, 'riassunti del PC'];
+  if (st) nuove.push([/vacch|capi|mandria|gravid|lattaz|ascius/i, () => { const C = st.capi || {};
+    return n0(C.lattazione) + ' vacche in lattazione e ' + n0(C.asciutta) + ' in asciutta; ' + n0(C.gravide) + ' gravide, ' + n0(C.da_fecondare) + ' da fecondare.'; }, 'Gestionale · stalla']);
+  if (mg) nuove.push([/gasolio|adblue|magazzin|scort|giacenz|c'?è ancora|rimast/i, q => {
+    const qn = norm(q), hit = (mg.prodotti || []).filter(p => norm(p.nome).split(/[^a-z0-9]+/).some(w => w.length >= 4 && qn.includes(w)));
+    if (hit.length) return hit.slice(0, 4).map(p => p.nome + ': ' + numIt(p.g, p.g % 1 ? 1 : 0) + ' ' + p.u).join('; ') + '.';
+    const g = mg.gasolio || []; return (g.length ? g.map(p => p.nome + ': ' + n0(p.g) + ' ' + p.u).join('; ') + '. ' : '') + (mg.avvisi && mg.avvisi.length ? mg.avvisi.length + ' prodotti da controllare in magazzino.' : 'Nessun prodotto da controllare.'); }, 'Gestionale · magazzino']);
+  if (me) nuove.push([/prezz|mercat|quotaz|vale|spot|urea|soia|fieno|orzo/i, q => {
+    const qn = norm(q), l = (me.prezzi || []).filter(p => p.ultimo), hit = l.filter(p => norm(p.nome).split(/[^a-z0-9]+/).some(w => w.length >= 4 && qn.includes(w)));
+    return (hit.length ? hit : l.filter(p => p.gruppo === 'latte')).slice(0, 4).map(p => p.nome + ' ' + numIt(p.ultimo[1], p.ultimo[1] < 10 ? 3 : 2) + ' ' + p.u).join('; ') + '.'; }, 'Gestionale · mercati']);
+  if (lv) nuove.push([/lavor|semin|raccol|trattament|mezz|trattor/i, q => /mezz|trattor/i.test(q)
+    ? 'Mezzi: ' + (lv.mezzi || []).map(m => m.nome).join(', ') + '.'
+    : 'Ultimi lavori: ' + (lv.ultimi || []).slice(0, 4).map(o => o.tipo + (o.campo ? ' ' + o.campo : '') + ' il ' + gm(o.data)).join('; ') + '.' + (lv.in_ritardo ? ' In ritardo: ' + lv.in_ritardo + '.' : ''), 'Gestionale · lavori']);
+  if (no && no.articoli && no.articoli.length) nuove.push([/notizi|giornal|news/i, () => 'Notizie del ' + gm(no.giorno) + ': ' + no.articoli.slice(0, 3).map(a => a.titolo).join(' · ') + '.', 'rassegna del gestionale']);
+  if (auto) nuove.unshift([/auto|macchin|bollo|revision|tagliand|assicuraz/i, () => (auto.scadenze || []).slice(0, 4).map(s => s.titolo + (s.data ? ' il ' + gm(s.data) : '') + (s.km ? ' a ' + n0(s.km) + ' km' : '')).join('; ') + '.', 'Libretto dell’auto']);
+  // le risposte finte che parlano di cose ormai vere escono
+  for (let i = RISP.length - 1; i >= 0; i--) if (/vacca 214|silo 2/i.test(typeof RISP[i][1] === 'string' ? RISP[i][1] : '')) RISP.splice(i, 1);
+  RISP.unshift(...nuove, generale);
+  // la regola del mondo trading viene prima di tutto: su comprare e vendere nessun consiglio (Agente Smith 26/11)
+  const iNo = RISP.findIndex(x => x[0].test('compr')); if (iNo > 0) RISP.unshift(...RISP.splice(iNo, 1));
+  // striscia Azienda: i mezzi veri; silos e fotovoltaico restano esempi e lo dicono
+  const voci = STRISCIA.azienda[1];
+  voci.forEach((v, i) => { if (/^Mezzi/.test(v[0]) && lv && lv.mezzi) voci[i] = ['Mezzi', lv.mezzi.length + (lv.mezzi.length === 1 ? ' trattore' : ' trattori'), 100];
+    else if (/^Silo|^Fotovolt/.test(v[0])) { v[0] += ' (esempio)'; v[3] = ''; } });
+  for (let i = DA_GUARDARE.length - 1; i >= 0; i--) if (/silos|fv/.test(DA_GUARDARE[i][1]) && DA_GUARDARE[i][0] === 'azienda') DA_GUARDARE.splice(i, 1);
+  SUGG.splice(0, SUGG.length, 'Cosa c\'è da guardare?', 'Quanto gasolio c\'è?', 'Prezzo del latte?', 'Ultimi lavori?');
+})(); }
 /** Un campo citato nella domanda ("dov'è il Campo Nord?") */
 function trovaCampo(q){
   const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -360,7 +403,7 @@ function chiedi(q){ if (!q.trim()) return; msg(q, 'u');
   if (c){ setTimeout(() => { msg(`${c.nome}: ${c.ettari ? numIt(c.ettari, 2) + ' ha' : 'superficie non indicata'}${c.coltura ? ', ' + c.coltura : ''}. È ${doveCampo(c)}. Te lo mostro.`, 'o', FONTI.campi ? 'Gestionale · campi' : 'campi finti');
     setTimeout(() => vai('campi', c.id), 900); }, 300); return; }
   const r = RISP.find(([re]) => re.test(q)) || [0, 'Questo dato non ce l\'ho ancora. Quando il Fabbro avrà aperto la porta giusta, saprò risponderti.', 'nessuna'];
-  setTimeout(() => msg(r[1], 'o', r[2]), 380); }
+  setTimeout(() => msg(typeof r[1] === 'function' ? r[1](q) : r[1], 'o', r[2]), 380); }
 $('#f').addEventListener('submit', e => { e.preventDefault(); chiedi($('#q').value); $('#q').value = ''; });
 $('#sugg').innerHTML = SUGG.map(s => `<button type="button">${esc(s)}</button>`).join('');
 
