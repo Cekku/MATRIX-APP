@@ -242,7 +242,8 @@ function pagCampi() {
   h += carta('Mappa', `<input class="pl-cerca" id="cerca-campo" type="search" placeholder="Cerca un campo per nome" value="${esc(stato.cercaCampo)}" autocomplete="off">
     <div class="pl-mappa" style="margin-top:10px">${svgMappa()}
       <div class="zoom"><button type="button" data-zoom="0.7" aria-label="Ingrandisci">+</button><button type="button" data-zoom="1.45" aria-label="Rimpicciolisci">−</button><button type="button" data-zoom="0" aria-label="Vista intera" style="font-size:14px">⤢</button></div>
-      ${sel ? `<div class="info"><b>${esc(sel.nome)}</b><br><span style="color:var(--mut)">${esc(sel.coltura || 'coltura non indicata')} · ${nf(sel.ettari, 2)} ha</span></div>` : ''}</div>
+      ${sel ? `<div class="info"><b>${esc(sel.nome)}</b><br><span style="color:var(--mut)">${esc(sel.coltura || 'coltura non indicata')} · ${nf(sel.ettari, 2)} ha</span>
+        <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="pl-btn" data-scheda-campo="${esc(sel.id)}">Scheda</button><button type="button" class="pl-btn" data-campo3d="${esc(sel.id)}">${ic('cubo')}<span>3D</span></button></div></div>` : ''}</div>
     <div class="pl-legenda">${fam.map(x => `<button type="button" class="pl-leg ${stato.famSel === x.f[0] ? 'on' : ''}" data-fam="${x.f[0]}" style="--c:${x.f[2]}">${esc(x.f[3])}</button>`).join('')}</div>
     <p class="pl-nota">Tocca un campo per il nome, una coltura qui sopra per evidenziarla. Due dita o rotella per ingrandire, trascina per spostare. Nord in alto.</p>`, 'campi/campi/tutti');
   h += `<div class="pl-griglia">` + carta('Colture', `<div class="pl-barre">${fam.map(x => `<div class="pl-barra"><span>${esc(x.f[3])} <small style="color:var(--fioco)">${x.n}</small></span>
@@ -407,6 +408,21 @@ function apriCerca() {
   setTimeout(() => { const i = $('#cerca-tutto'); if (i) i.focus(); }, 30);
 }
 
+function schedaCampo(id) {
+  const c = (window.CAMPI_VERI || []).find(x => String(x.id) === String(id)); if (!c) return;
+  const lv = dati('campi/riepilogo/lavori'), lavori = ((lv && lv.per_campo) || {})[c.id] || [], f = famiglia(c.coltura);
+  apriFoglio(`<button type="button" class="pl-btn pl-chiudi" data-chiudi aria-label="Chiudi">${ic('x')}</button><h3>${esc(c.nome)}</h3>
+    <p class="pl-sotto"><i class="pl-punto" style="display:inline-block;background:${f[2]};margin-right:6px"></i>${esc(c.coltura || 'coltura non indicata')} · ${nf(c.ettari, 2)} ha</p>
+    <h2 style="font:600 13px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)">Lavori su questo campo</h2>
+    ${lavori.length ? `<div class="pl-elenco">${lavori.map(o => riga({ lv: o.stato === 'Fatto' ? '' : 'info', t: o.tipo, s: [gma(o.data), o.stato === 'Fatto' ? 'fatto' : o.stato.toLowerCase(), o.mezzo].filter(Boolean).join(' · ') }, false)).join('')}</div>`
+      : '<p class="pl-vuoto">Nessun lavoro registrato nel gestionale per questo campo.</p>'}
+    <div style="display:flex;gap:8px;margin-top:14px"><button type="button" class="pl-btn" data-campo3d="${esc(c.id)}">${ic('cubo')}<span>Vedi nel 3D</span></button></div>`);
+}
+function campoNel3d(id) {
+  chiudiFoglio();
+  Promise.resolve(opz.apri3d()).then(() => setTimeout(() => { try { if (typeof window.vai === 'function') window.vai('campi', id); } catch (_) { } }, 700));
+}
+
 /* mappa: zoom e spostamento con dita, rotella e pulsanti */
 function centra(p) {
   const [x0, y0, x1, y1] = p.box, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, w = Math.max(MAPPA.base[2] / 8, (x1 - x0) * 3, (y1 - y0) * 3);
@@ -472,6 +488,8 @@ export function avviaPlancia(o) {
     const ag = e.target.closest('[data-arg]'); if (ag) { stato.argNot = ag.dataset.arg; return disegna(); }
     const od = e.target.closest('[data-ord]'); if (od) { stato.ordMag = od.dataset.ord; return disegna(); }
     if (cm) { chiudiFoglio(); return vai('campi'), apriCampo(cm.dataset.campo); }
+    const sc = e.target.closest('[data-scheda-campo]'); if (sc) return schedaCampo(sc.dataset.schedaCampo);
+    const c3 = e.target.closest('[data-campo3d]'); if (c3) return campoNel3d(c3.dataset.campo3d);
     const mc = e.target.closest('[data-mercato]'); if (mc) return apriMercato(+mc.dataset.mercato);
     const pr = e.target.closest('[data-prodotto]'); if (pr) { stato.filtroMag = pr.dataset.prodotto; stato.catMag = ''; return vai('magazzino'); }
     if (z && MAPPA) { const f = +z.dataset.zoom; const svg = $('#mappa-svg');
