@@ -170,6 +170,14 @@ const FONTI = {
 // nomi delle parti nel GLB → oggetto toccabile (basta che il nome della parte contenga la parola)
 const NOMI_GLB = [['stalla',/stalla|barn|cow/i],['silos',/silo/i],['fv',/fotovolt|pannell|solar|pv/i],
   ['sala',/mungit|milk|sala/i],['rimessa',/rimessa|shed|garage|tettoia/i],['ufficio',/ufficio|office/i]];
+// zone della stalla vera: dal nome del gruppo nel modello (CONCIMAIA, CUCCETTE_..., ESISTENTE...) al nome da mostrare.
+// L'ordine conta: "esistente_muri" è un muro, "ESISTENTE" è la stalla. Terreno, strade, ghiaia e fondazioni non si toccano.
+const ZONE_GLB = [[/terreno|strad|ghiaia|fondazion/i, null], [/concimai/i,'concimaia','Concimaia','dove si raccoglie il letame'],
+  [/cuccett/i,'cuccette','Cuccette','dove le vacche si sdraiano a riposare'], [/portoni/i,'portoni','Portoni interni','portoni e cancelli dentro la stalla'],
+  [/vasch/i,'vasche','Vasche nuove','vasche del progetto nuovo'], [/carpenteria/i,'carpenteria','Carpenteria nuova','struttura in acciaio del progetto nuovo'],
+  [/vetro|tetto|omega/i,'tetto','Tetto','copertura, con le parti in vetro'], [/muri|muro/i,'muri','Muri','muri della stalla esistente'],
+  [/recint|rencint/i,'recinto','Recinto','recinzione intorno'], [/esistente/i,'stalla','Stalla','la stalla di oggi']];
+const ZONE_DENTRO = new Set(['stalla','cuccette','portoni','vasche','muri']); // per guardarle si toglie il tetto
 // colori e altezze per coltura (i colori sono spenti: è un dato, non decorazione)
 const COLTURE = {mais:{col:0x5c5634,alto:.8}, prato:{col:0x2f4a35,alto:1.2}, soia:{col:0x4a4a2e,alto:.6},
   orzo:{col:0x40503a,alto:.9}, frumento:{col:0x5a5333,alto:.9}, medica:{col:0x2f5443,alto:1.6}, altro:{col:0x454c55,alto:.6}};
@@ -376,11 +384,12 @@ function apriDett(id){
   $('#dett').innerHTML = `<div class="maniglia"></div><div class="dtesta"><span class="occhiello">${esc(nomeMondo(mondo))} · dettaglio</span>
       <button class="chiudi" data-azione="indietro" aria-label="Chiudi e torna alla vista intera">✕</button></div>
     <h3>${esc(t)}</h3><p class="sub">${esc(s)}</p>
-    ${rami ? `<div class="rami">${rami.map(([n, l, c, dd]) => dd && dd !== id
+    ${rami ? `<div class="rami${E.zone && E.zone[id] ? ' zone' : ''}">${rami.map(([n, l, c, dd]) => dd && dd !== id
         ? `<button class="ramo ${c || ''}" data-d="${dd}"><span class="num">${esc(n)}</span><span>${esc(l)}</span></button>`
         : `<div class="ramo ${c || ''}"><span class="num">${esc(n)}</span><span>${esc(l)}</span></div>`).join('')}</div>` : ''}
     ${righe.map(([a, b, c]) => `<div class="riga"><span>${esc(a)}</span><b class="${c || ''}">${esc(b)}</b></div>`).join('')}
-    ${nota ? `<div class="nota-d">${esc(nota)}</div>` : ''}`;
+    ${nota ? `<div class="nota-d">${esc(nota)}</div>` : ''}
+    ${E.zone && E.zone.tetto && E.zone[id] && id !== 'tetto' ? `<button class="tetto-btn" id="tetto-btn" data-azione="tetto">${tettoVia() ? 'Rimetti il tetto' : 'Togli il tetto'}</button>` : ''}`;
   const el = $('#dett'); el.classList.add('aperto'); el.inert = false; el.scrollTop = 0; aggiornaSpazi();
 }
 function chiudiDett(){ const el = $('#dett'); el.classList.remove('aperto'); el.inert = true; aggiornaSpazi(); }
@@ -402,6 +411,9 @@ function chiedi(q){ if (!q.trim()) return; msg(q, 'u');
   const c = trovaCampo(q);
   if (c){ setTimeout(() => { msg(`${c.nome}: ${c.ettari ? numIt(c.ettari, 2) + ' ha' : 'superficie non indicata'}${c.coltura ? ', ' + c.coltura : ''}. È ${doveCampo(c)}. Te lo mostro.`, 'o', FONTI.campi ? 'Gestionale · campi' : 'campi finti');
     setTimeout(() => vai('campi', c.id), 900); }, 300); return; }
+  const z = FONTI.modelloAzienda && ZONE_GLB.find(([re, d]) => d && d !== 'stalla' && d !== 'muri' && re.test(q));
+  if (z){ setTimeout(() => { msg(`${z[2]}: ${z[3]}. Te la mostro nel progetto 3D della stalla.`, 'o', 'progetto 3D della stalla');
+    setTimeout(() => vai('azienda', z[1]), 900); }, 300); return; }
   const r = RISP.find(([re]) => re.test(q)) || [0, 'Questo dato non ce l\'ho ancora. Quando il Fabbro avrà aperto la porta giusta, saprò risponderti.', 'nessuna'];
   setTimeout(() => msg(typeof r[1] === 'function' ? r[1](q) : r[1], 'o', r[2]), 380); }
 $('#f').addEventListener('submit', e => { e.preventDefault(); chiedi($('#q').value); $('#q').value = ''; });
@@ -572,11 +584,11 @@ function seleziona(d){
   if (p && E.R){ E.meta.t.copy(p.c); E.meta.dist = p.r; E.meta.el = limita(E.meta.el, .42, .72); E.auto = false; }
   $('#indietro').hidden = false;
   E.etich.forEach(x => { x.el.classList.toggle('sel', x.d === d); x.el.classList.toggle('fioco', x.d !== d); });
-  apriDett(d); striscia(d);
+  apriDett(d); striscia(d); aggiornaZone();
 }
 function indietro(){
-  E.sel = null; chiudiDett(); vistaIntera(); striscia(null); $('#indietro').hidden = true;
-  E.etich.forEach(x => x.el.classList.remove('sel', 'fioco'));
+  E.sel = null; E.tettoVia = null; chiudiDett(); vistaIntera(); striscia(null); $('#indietro').hidden = true;
+  E.etich.forEach(x => x.el.classList.remove('sel', 'fioco')); aggiornaZone();
 }
 function vistaIntera(){ if (!E.R) return; const v = vista(mondo); E.meta.t.set(0, v.ty, 0); E.meta.dist = v.dist; E.meta.el = v.el;
   E.auto = !nordFisso(mondo); if (!E.auto) E.meta.az = Math.round(E.cur.az / (Math.PI * 2)) * Math.PI * 2; }
@@ -606,7 +618,7 @@ function vai(m, d){ chiudiOracolo(); if (m !== mondo) vaiMondo(m, () => d && sel
 async function costruisci(m){
   if (E.G){ E.scena.remove(E.G); libera(E.G); }
   E.G = new THREE.Group(); E.scena.add(E.G);
-  E.bordi = []; E.anima = []; E.punti = {}; E.luciNotte = []; E.etich = []; $('#etich').innerHTML = '';
+  E.bordi = []; E.anima = []; E.punti = {}; E.luciNotte = []; E.etich = []; E.zone = null; E.tettoVia = null; $('#etich').innerHTML = '';
   const k = creaKit();
   basamento(k, m);
   try { await MODELLI[m](k); } catch (err) { console.warn('Modello non costruito:', err.message); }
@@ -868,13 +880,46 @@ async function caricaGLB(url, k){
   const gltf = await new Promise((ok, ko) => new THREE.GLTFLoader().load(url, ok, undefined, ko));
   const m = gltf.scene, box = new THREE.Box3().setFromObject(m), sz = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   const s = 84 / Math.max(sz.x, sz.z, 1); m.scale.setScalar(s); m.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+  const nomiZone = {}; E.zone = {};
   m.traverse(o => { if (!o.isMesh) return; k.ombra(o);
+    // la zona: il primo antenato con un nome che conosciamo (i pezzi senza nome prendono quello del loro gruppo)
+    let z; for (let a = o; a && a !== m && !z; a = a.parent) if (a.name) z = ZONE_GLB.find(([re]) => re.test(a.name));
+    if (z){ if (!z[1]) return; o.userData.d = z[1]; nomiZone[z[1]] = z;
+      o.material = Array.isArray(o.material) ? o.material.map(x => x.clone()) : o.material.clone(); // per illuminare solo la zona scelta
+      (E.zone[z[1]] = E.zone[z[1]] || []).push(o); return; }
     const nome = o.name + ' ' + (o.parent ? o.parent.name : ''); const hit = NOMI_GLB.find(([, re]) => re.test(nome)); if (hit) o.userData.d = hit[0]; });
+  if (!Object.keys(E.zone).length) E.zone = null;
   k.G.add(m); m.updateMatrixWorld(true);
   const per = {}; m.traverse(o => { if (o.isMesh && o.userData.d) (per[o.userData.d] = per[o.userData.d] || new THREE.Box3()).union(new THREE.Box3().setFromObject(o)); });
+  if (E.zone) zoneStalla(per, nomiZone);
   for (const d in per){ const cc = per[d].getCenter(new THREE.Vector3()); const lv = DA_GUARDARE.some(x => x[1] === d && x[5]) ? 'at' : '';
-    k.etichetta(DETT[d] ? DETT[d][0] : d, cc.x, per[d].max.y + 2, cc.z, d, lv); if (lv) k.faro(cc.x, 0, cc.z, lv); }
+    k.etichetta(DETT[d] ? DETT[d][0] : d, cc.x, per[d].max.y + 2, cc.z, d, lv, {peso: d === 'stalla' ? 50 : d === 'tetto' ? -10 : 0});
+    if (lv) k.faro(cc.x, 0, cc.z, lv); }
 }
+/** Stalla vera: per ogni zona del modello una scheda (cos'è, quanti pezzi) e i bottoni per passare alle altre.
+ *  Niente misure: le zone hanno pezzi sparsi e la scala del modello non è certa, sarebbero numeri sbagliati. */
+function zoneStalla(per, nomi){
+  const ordine = Object.keys(per).filter(d => nomi[d]);
+  ordine.sort((a, b) => (b === 'stalla') - (a === 'stalla') || nomi[a][2].localeCompare(nomi[b][2]));
+  ordine.forEach(d => {
+    if (d !== 'stalla' || !DETT.stalla) DETT[d] = [nomi[d][2], nomi[d][3], [['Pezzi nel modello', numIt(E.zone[d].length, 0)]],
+      'Dal progetto 3D della stalla.' + (ZONE_DENTRO.has(d) ? ' Il tetto si toglie da solo per guardare dentro.' : '')];
+    RAMI[d] = ordine.filter(x => x !== d).map(x => ['›', nomi[x][2], '', x]); });
+}
+/** Stalla vera: la zona scelta resta piena e illuminata, le altre diventano trasparenti; il tetto si toglie per guardare dentro. */
+function aggiornaZone(){
+  if (!E.zone) return; const acc = new THREE.Color(getComputedStyle(document.body).getPropertyValue('--acc').trim() || '#cfd8e3');
+  const scelta = E.sel && E.zone[E.sel];
+  for (const d in E.zone){ const su = d === E.sel, ombra = scelta && !su;
+    E.zone[d].forEach(o => [].concat(o.material).forEach(x => {
+      if (x.userData.op === undefined) x.userData.op = [x.transparent, x.opacity, x.depthWrite];
+      if (x.emissive) su ? x.emissive.copy(acc).multiplyScalar(.35) : x.emissive.setRGB(0, 0, 0);
+      const [t, op, dw] = x.userData.op; x.transparent = ombra || t; x.opacity = ombra ? .18 : op; x.depthWrite = ombra ? false : dw; x.needsUpdate = true; })); }
+  const via = tettoVia();
+  (E.zone.tetto || []).forEach(o => { o.visible = !via || E.sel === 'tetto'; });
+  const b = $('#tetto-btn'); if (b) b.textContent = via ? 'Rimetti il tetto' : 'Togli il tetto';
+}
+const tettoVia = () => E.tettoVia !== null && E.tettoVia !== undefined ? E.tettoVia : !!(E.sel && ZONE_DENTRO.has(E.sel));
 /** Foto satellitare sotto i campi veri (solo se ci sono le tessere), con i nomi dei paesi sopra. */
 function fotoSatellitare(k, campi){
   const z = MAPPA.z, carica = new THREE.TextureLoader(), aniso = Math.min(8, E.R.capabilities.getMaxAnisotropy());
@@ -1052,6 +1097,7 @@ document.addEventListener('click', e => {
     if (az === 'oracolo') return $('#oracolo').hidden ? apriOracolo() : chiudiOracolo();
     if (az === 'cassetto'){ const c = $('#cassetto'); c.hidden = !c.hidden; if (!c.hidden) disegnaCassetto(); return; }
     if (az === 'indietro') return indietro();
+    if (az === 'tetto'){ E.tettoVia = !tettoVia(); return aggiornaZone(); }
     if (az === 'sfondo'){ const k = Object.keys(NOMI_SFONDO); return scegliSfondo(k[(k.indexOf(SFONDO) + 1) % k.length]); } }
   const sf = t.closest('[data-sfondo]'); if (sf) return scegliSfondo(sf.dataset.sfondo);
   const m = t.closest('[data-m]'); if (m) return vaiMondo(m.dataset.m);
